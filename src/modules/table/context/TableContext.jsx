@@ -1,0 +1,259 @@
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  getCurrentTableNumber,
+  setCurrentTableNumber,
+  getActiveOrderByTableNumber,
+  getOrdersByTableNumber,
+} from "../services/tableOrdersService";
+import { createTableOrder, getActiveTableOrder, requestTableService } from "../services/tableGateway";
+import { createTrackingSocket } from "@/services/realtime";
+
+const TableContext = createContext(null);
+
+export function TableProvider({ children }) {
+  const params = useParams();
+  const navigate = useNavigate();
+  const tableToken = new URLSearchParams(window.location.search).get("token") || sessionStorage.getItem(`404_table_token_${params.tableId || 4}`) || "";
+
+  // Active table number (from param or saved)
+  const [tableNumber, setTableNumberState] = useState(() => {
+    if (params.tableId && !isNaN(parseInt(params.tableId, 10))) {
+      return parseInt(params.tableId, 10);
+    }
+    return getCurrentTableNumber();
+  });
+
+  const [activeOrder, setActiveOrder] = useState(null);
+  const [tableOrders, setTableOrders] = useState([]);
+  const [toastMessage, setToastMessage] = useState(null);
+  const [isWaiterModalOpen, setIsWaiterModalOpen] = useState(false);
+  const [isTableSelectorOpen, setIsTableSelectorOpen] = useState(false);
+  const refreshInFlight = useRef(null);
+
+  // Table Cart State
+  const [tableCart, setTableCart] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`404_table_cart_${tableNumber}`) || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  // Sync with URL params if tableId changes
+  useEffect(() => {
+    if (params.tableId && !isNaN(parseInt(params.tableId, 10))) {
+      const pNum = parseInt(params.tableId, 10);
+      if (pNum !== tableNumber) {
+        setTableNumberState(pNum);
+        setCurrentTableNumber(pNum);
+      }
+    }
+  }, [params.tableId]);
+
+  // Load orders for current table
+  const refreshTableData = useCallback(async () => {
+    if (refreshInFlight.current) return refreshInFlight.current;
+    const task = (async () => {
+    const orders = getOrdersByTableNumber(tableNumber);
+    setTableOrders(orders);
+    const localActive = getActiveOrderByTableNumber(tableNumber);
+    setActiveOrder(localActive);
+    try {
+      const remoteActive = await getActiveTableOrder(tableNumber, tableToken);
+      if (remoteActive) {
+        setActiveOrder(remoteActive);
+        setTableOrders((current) => [remoteActive, ...current.filter((order) => order.id !== remoteActive.id)]);
+      }
+    } catch {
+      // Keep the local/demo order until the table API becomes available.
+    }
+    })();
+    refreshInFlight.current = task;
+    try {
+      return await task;
+    } finally {
+      refreshInFlight.current = null;
+    }
+  }, [tableNumber, tableToken]);
+
+  useEffect(() => {
+    if (tableToken) sessionStorage.setItem(`404_table_token_${tableNumber}`, tableToken);
+  }, [tableNumber, tableToken]);
+
+  useEffect(() => {
+    refreshTableData();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshTableData();
+    };
+    const intervalId = window.setInterval(refreshWhenVisible, 60000);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [tableNumber, refreshTableData]);
+
+  useEffect(() => {
+    const trackingToken = activeOrder?.trackingToken;
+    if (!trackingToken) return undefined;
+    const socket = createTrackingSocket(trackingToken);
+    const handleOrderUpdate = (payload) => {
+      const updated = payload?.order;
+      if (!updated || Number(updated.id) !== Number(activeOrder.id)) return;
+      setActiveOrder(updated);
+      setTableOrders((current) => [updated, ...current.filter((order) => Number(order.id) !== Number(updated.id))]);
+    };
+    socket.on("order:updated", handleOrderUpdate);
+    return () => {
+      socket.off("order:updated", handleOrderUpdate);
+      socket.disconnect();
+    };
+  }, [activeOrder?.id, activeOrder?.trackingToken]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`404_table_cart_${tableNumber}`, JSON.stringify(tableCart));
+    } catch {
+      // The cart still works in memory when storage is unavailable.
+    }
+  }, [tableCart, tableNumber]);
+
+  useEffect(() => {
+    const syncCart = (event) => {
+      if (Number(event.detail?.tableNumber) === Number(tableNumber)) {
+        setTableCart(event.detail.items || []);
+      }
+    };
+    window.addEventListener("table-cart-updated", syncCart);
+    return () => window.removeEventListener("table-cart-updated", syncCart);
+  }, [tableNumber]);
+
+  const showToast = (message) => {
+    setToastMessage(message);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3500);
+  };
+
+  const changeTableNumber = (newTableNum) => {
+    const num = parseInt(newTableNum, 10);
+    if (!isNaN(num) && num > 0) {
+      setTableNumberState(num);
+      setCurrentTableNumber(num);
+      showToast(`تم التبديل إلى طاولة رقم ${num} بنجاح 🪑`);
+      setIsTableSelectorOpen(false);
+    }
+  };
+
+  // Waiter Call
+  const triggerCallWaiter = async (reason = "طلب حضور الويتر") => {
+    await requestTableService({ tableNumber, tableToken, type: "WAITER", reason });
+    showToast(`تم إرسال تنبيه للجرسون للحضور إلى طاولة رقم ${tableNumber} (${reason})`);
+    setIsWaiterModalOpen(false);
+  };
+
+  // Bill Request
+  const triggerRequestBill = async (method = "كاش") => {
+    await requestTableService({ tableNumber, tableToken, type: "BILL", reason: method });
+    showToast(`🧾 تم إرسال طلب الحساب والفاتورة (${method}) لكاشير طاولة رقم ${tableNumber}`);
+  };
+
+  // Cart operations
+  const addToTableCart = (product) => {
+    if (!product) return;
+    setTableCart((prev) => {
+      const existing = prev.find((item) => item.id === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + (product.quantity || 1) }
+            : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: product.id,
+          name: product.name,
+          englishName: product.englishName || "",
+          price: product.price,
+          unitPrice: product.price,
+          quantity: product.quantity || 1,
+          image: product.image,
+          customizations: product.customizations || {
+            size: product.size || "عادي",
+            sugar: product.sugar || "مضبوط",
+            milk: product.milk || "عادي",
+            addons: product.addons || [],
+            notes: product.notes || "",
+          },
+        },
+      ];
+    });
+    showToast(`تمت إضافة ${product.name} إلى سلة طلب طاولة رقم ${tableNumber} ☕`);
+  };
+
+  const updateCartQuantity = (id, newQty) => {
+    if (newQty <= 0) {
+      setTableCart((prev) => prev.filter((item) => item.id !== id));
+    } else {
+      setTableCart((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, quantity: newQty } : item))
+      );
+    }
+  };
+
+  const removeFromCart = (id) => {
+    setTableCart((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const totalCartItemsCount = tableCart.reduce((sum, it) => sum + (it.quantity || 1), 0);
+
+  const submitTableOrder = async () => {
+    if (!tableCart.length) return null;
+    const created = await createTableOrder({ tableNumber, tableToken, items: tableCart });
+    setTableCart([]);
+    await refreshTableData();
+    showToast(`تم إرسال طلب طاولة رقم ${tableNumber} بنجاح`);
+    return created;
+  };
+
+  const value = {
+    tableNumber,
+    changeTableNumber,
+    activeOrder,
+    tableOrders,
+    refreshTableData,
+    toastMessage,
+    showToast,
+    isWaiterModalOpen,
+    setIsWaiterModalOpen,
+    isTableSelectorOpen,
+    setIsTableSelectorOpen,
+    triggerCallWaiter,
+    triggerRequestBill,
+    // Cart
+    tableCart,
+    isCartOpen,
+    setIsCartOpen,
+    addToTableCart,
+    updateCartQuantity,
+    removeFromCart,
+    totalCartItemsCount,
+    submitTableOrder,
+  };
+
+  return <TableContext.Provider value={value}>{children}</TableContext.Provider>;
+}
+
+export function useTable() {
+  const context = useContext(TableContext);
+  if (!context) {
+    throw new Error("useTable must be used within a TableProvider");
+  }
+  return context;
+}

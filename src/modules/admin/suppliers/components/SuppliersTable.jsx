@@ -1,0 +1,16 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ChevronLeft,ChevronRight,Eye,RefreshCw,Search,Trash2,Users } from "lucide-react";
+import { useDeleteSupplier, useSuppliers } from "../hooks/useSuppliers";
+import "./SuppliersTable.css";
+function SuppliersTable(){
+ const navigate=useNavigate();const [search,setSearch]=useState(""),[page,setPage]=useState(1),[pageSize,setPageSize]=useState(10);
+ const query=useSuppliers({page,pageSize,search});
+ const remove=useDeleteSupplier();
+ const rows=query.data?.data||[],pagination=query.data?.pagination||{total:0,totalPages:1};
+ return <div className="suppliers-table-card"><div className="table-card-header"><div className="table-card-title"><div className="title-users-badge"><Users size={18}/></div><span>قائمة الموردين</span></div><div className="table-header-actions"><div className="search-input-wrapper"><input className="table-search-input" placeholder="ابحث بالاسم أو الهاتف أو المدينة" value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}}/><Search size={17} className="table-search-icon"/></div><button className="refresh-btn" onClick={()=>query.refetch()}><RefreshCw size={16}/>تحديث</button></div></div>
+ {query.isError&&<div className="data-state data-state--error">تعذر تحميل الموردين.</div>}{remove.isError&&<div className="data-state data-state--error">{remove.error?.response?.data?.message||"تعذر حذف المورد"}</div>}
+ <div className="table-responsive-container"><table className="custom-suppliers-table"><colgroup><col className="col-index"/><col/><col/><col className="col-phone"/><col/><col/><col className="col-actions"/></colgroup><thead><tr><th>م</th><th>اسم المورد</th><th>اسم المسؤول</th><th>رقم الهاتف</th><th>نوع المورد</th><th>المدينة</th><th className="actions-heading">الإجراءات</th></tr></thead><tbody>{query.isLoading?<tr><td colSpan="7">جاري التحميل...</td></tr>:rows.length===0?<tr><td colSpan="7">لا يوجد موردون.</td></tr>:rows.map((row,index)=><tr key={row.id}><td>{(page-1)*pageSize+index+1}</td><td className="supplier-name-cell">{row.name}</td><td>{row.contactPerson}</td><td dir="ltr">{row.phone}</td><td>{row.supplierType}</td><td>{row.city}</td><td className="actions-cell"><div className="row-actions-group"><button type="button" className="action-icon-btn btn-view" title="عرض تفاصيل المورد" aria-label={`عرض تفاصيل ${row.name}`} onClick={()=>navigate(`/admin/suppliers/${row.id}`)}><Eye size={17}/></button><button type="button" className="action-icon-btn btn-delete" title="حذف المورد" aria-label={`حذف ${row.name}`} onClick={()=>window.confirm(`حذف المورد «${row.name}»؟`)&&remove.mutate(row.id)}><Trash2 size={17}/></button></div></td></tr>)}</tbody></table></div>
+ <div className="table-pagination-bar"><div className="pagination-info"><span>إجمالي {pagination.total}</span><select value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(1)}}><option>10</option><option>25</option><option>50</option></select></div><div className="pagination-nav-group"><button disabled={page<=1} onClick={()=>setPage(p=>p-1)}><ChevronRight/></button><b>{page}</b><button disabled={page>=pagination.totalPages} onClick={()=>setPage(p=>p+1)}><ChevronLeft/></button></div></div></div>
+}
+export default SuppliersTable;
