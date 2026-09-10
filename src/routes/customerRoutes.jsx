@@ -1,4 +1,5 @@
 import { lazy } from 'react';
+import { Navigate } from 'react-router-dom';
 const CustomerLayout = lazy(() => import('../layouts/CustomerLayout'));
 const CustomerMainPage = lazy(() => import('@/modules/customer/main-page/pages/CustomerMainPage'));
 const MenuPage = lazy(() => import('@/modules/customer/menu/pages/MenuPage'));
@@ -13,8 +14,7 @@ export const customerRoutes = {
   element: <CustomerLayout />,
   children: [
     {
-      index: true,
-      element: <CustomerMainPage />,
+      index: true, element: <Navigate to="/admin/dashboard" replace />,
     },
     {
       path: 'customer',
@@ -104,3 +104,5 @@ export const customerRoutes = {
 };
 
 export default customerRoutes;
+
+

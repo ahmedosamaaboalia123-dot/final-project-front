@@ -2,7 +2,7 @@ import { lazy } from "react";
 import { Navigate } from "react-router-dom";
 
 
-import ProtectedRoute from "@/routes/ProtectedRoute";
+
 
 const LayoutAdmin = lazy(() => import("@/layouts/AdminLayout/LayoutAdmin"));
 
@@ -38,7 +38,7 @@ const CustomerDetailsPage = lazy(() => import("@/modules/admin/customers/pages/C
 const DelegatesPage = lazy(() => import("@/modules/admin/delegates/pages/DelegatesPage"));
 const DelegateDetailsPage = lazy(() => import("@/modules/admin/delegates/pages/DelegateDetailsPage"));
 
-const permitted = (pageKey, element) => <ProtectedRoute pageKey={pageKey}>{element}</ProtectedRoute>;
+
 
 
 
@@ -48,7 +48,7 @@ const adminRoutes = {
     path:"/admin",
 
 
-    element:<ProtectedRoute><LayoutAdmin/></ProtectedRoute>,
+    element:<LayoutAdmin/>,
 
 
     children:[
@@ -65,7 +65,7 @@ const adminRoutes = {
 
             path:"dashboard",
 
-            element:permitted("dashboard", <DashboardPage/> )
+            element:<DashboardPage/>
 
         },
 
@@ -75,7 +75,7 @@ const adminRoutes = {
 
             path:"products",
 
-            element:permitted("products", <ProductsPage/> )
+            element:<ProductsPage/>
 
         },
 
@@ -84,7 +84,7 @@ const adminRoutes = {
 
             path:"inventory",
 
-            element:permitted("inventory", <InventoryPage/> )
+            element:<InventoryPage/>
 
         },
 
@@ -93,7 +93,7 @@ const adminRoutes = {
 
             path:"inventory/:id",
 
-            element:permitted("inventory", <MaterialDetailsPage/> )
+            element:<MaterialDetailsPage/>
 
         },
 
@@ -102,7 +102,7 @@ const adminRoutes = {
 
             path:"warnings",
 
-            element:permitted("warnings", <WarningsPage/> )
+            element:<WarningsPage/>
 
         },
 
@@ -111,7 +111,7 @@ const adminRoutes = {
 
             path:"invoices",
 
-            element:permitted("purchases", <PurchasesPage/> )
+            element:<PurchasesPage/>
 
         },
 
@@ -120,7 +120,7 @@ const adminRoutes = {
 
             path:"purchases",
 
-            element:permitted("purchases", <PurchasesPage/> )
+            element:<PurchasesPage/>
 
         },
 
@@ -129,7 +129,7 @@ const adminRoutes = {
 
             path:"employees",
 
-            element:permitted("employees", <EmployeesPage/> )
+            element:<EmployeesPage/>
 
         },
 
@@ -138,7 +138,7 @@ const adminRoutes = {
 
             path:"employees/:id",
 
-            element:permitted("employees", <EmployeeDetailsPage/> )
+            element:<EmployeeDetailsPage/>
 
         },
 
@@ -147,7 +147,7 @@ const adminRoutes = {
 
             path:"suppliers",
 
-            element:permitted("suppliers", <SuppliersPage/> )
+            element:<SuppliersPage/>
 
         },
 
@@ -156,7 +156,7 @@ const adminRoutes = {
 
             path:"suppliers/:id",
 
-            element:permitted("suppliers", <SupplierDetailsPage/> )
+            element:<SupplierDetailsPage/>
 
         },
 
@@ -165,7 +165,7 @@ const adminRoutes = {
 
             path:"returns",
 
-            element:permitted("returns", <ReturnsPage/> )
+            element:<ReturnsPage/>
 
         },
 
@@ -174,15 +174,15 @@ const adminRoutes = {
 
             path:"drawer",
 
-            element:permitted("drawer", <DrawerPage/> )
+            element:<DrawerPage/>
 
         },
-        { path:"financial-reports", element:permitted("financial_reports", <FinancialReportsPage/> ) },
+        { path:"financial-reports", element:<FinancialReportsPage/> },
         {
             path:"delegates",
             children: [
-                { index: true, element: permitted("delegates", <DelegatesPage/>) },
-                { path: ":id", element: permitted("delegates", <DelegateDetailsPage/>) },
+                { index: true, element: <DelegatesPage/> },
+                { path: ":id", element: <DelegateDetailsPage/> },
             ]
         },
 
@@ -195,29 +195,29 @@ const adminRoutes = {
 
                 { index: true, element: <OrdersHomePage /> },
 
-                { path: "online", element: permitted("orders_online", <OnlineScreen />) },
+                { path: "online", element: <OnlineScreen /> },
 
-                { path: "incoming", element: permitted("orders_online", <IncomingOnlineOrdersPage />) },
+                { path: "incoming", element: <IncomingOnlineOrdersPage /> },
 
-                { path: "takeaway", element: permitted("orders_online", <TakeawayScreen />) },
+                { path: "takeaway", element: <TakeawayScreen /> },
 
-                { path: "tables", element: permitted("orders_tables", <TablesScreen />) },
+                { path: "tables", element: <TablesScreen /> },
 
-                { path: "tables/:tableNumber", element: permitted("orders_tables", <TableSummaryPage />) },
+                { path: "tables/:tableNumber", element: <TableSummaryPage /> },
 
-                { path: "tables/:tableNumber/order/:orderId/track", element: permitted("orders_tables", <TableOrderTrackPage />) },
+                { path: "tables/:tableNumber/order/:orderId/track", element: <TableOrderTrackPage /> },
 
                 { path: "sales/:type/:id", element: <OrderSalesPage /> },
 
                 { path: "busy/:type/:id", element: <BusyCardPage /> },
 
-                { path: "preparation", element: permitted("orders_preparation", <PreparationPage />) },
+                { path: "preparation", element: <PreparationPage /> },
 
-                { path: "preparation/:orderId", element: permitted("orders_preparation", <OrderDetailsPage />) },
+                { path: "preparation/:orderId", element: <OrderDetailsPage /> },
 
-                { path: "history", element: permitted("orders_history", <OrderHistoryPage />) },
+                { path: "history", element: <OrderHistoryPage /> },
 
-                { path: "table-services", element: permitted("orders_table_services", <TableServicesPage />) },
+                { path: "table-services", element: <TableServicesPage /> },
 
             ]
 
@@ -230,9 +230,9 @@ const adminRoutes = {
 
             children: [
 
-                { index: true, element: permitted("customers", <CustomersPage />) },
+                { index: true, element: <CustomersPage /> },
 
-                { path: ":id", element: permitted("customers", <CustomerDetailsPage />) },
+                { path: ":id", element: <CustomerDetailsPage /> },
 
             ]
 
@@ -246,3 +246,5 @@ const adminRoutes = {
 
 
 export default adminRoutes;
+
+

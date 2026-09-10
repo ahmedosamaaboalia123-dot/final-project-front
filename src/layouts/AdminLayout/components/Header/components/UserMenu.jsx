@@ -52,6 +52,8 @@ const role = useAuthStore(
 );
 
 
+if (!employee) return <div className="user-menu"><h4>لوحة الإدارة</h4></div>;
+
 return (
 
 <div className="user-menu">
@@ -97,3 +99,6 @@ return (
 
 
 export default UserMenu;
+
+
+

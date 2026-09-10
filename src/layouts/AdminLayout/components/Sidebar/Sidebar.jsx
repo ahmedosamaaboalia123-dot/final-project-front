@@ -3,7 +3,25 @@ import { useLocation } from "react-router-dom";
 
 import SidebarItem from "./SidebarItem";
 
-import { useAuthStore } from "@/store/authStore";
+const adminNavigation = [
+    ["dashboard", "الرئيسية", "/dashboard"],
+    ["suppliers", "الموردين", "/suppliers"],
+    ["inventory", "المخزون", "/inventory"],
+    ["warnings", "التنبيهات", "/warnings"],
+    ["purchases", "المشتريات", "/purchases"],
+    ["returns", "المرتجعات", "/returns"],
+    ["products", "المنتجات", "/products"],
+    ["orders_online", "الطلبات الأونلاين", "/orders/online"],
+    ["orders_tables", "الطاولات", "/orders/tables"],
+    ["orders_table_services", "خدمات الطاولات", "/orders/table-services"],
+    ["orders_history", "سجل الطلبات", "/orders/history"],
+    ["orders_preparation", "التحضير", "/orders/preparation"],
+    ["customers", "العملاء", "/customers"],
+    ["delegates", "المناديب", "/delegates"],
+    ["drawer", "الخزنة", "/drawer"],
+    ["financial_reports", "التقارير المالية", "/financial-reports"],
+    ["employees", "الموظفين", "/employees"],
+].map(([page_key, page_name, path]) => ({ page_key, page_name, path }));
 
 import logo from "@/assets/images/404_logo-640.webp";
 
@@ -13,9 +31,7 @@ import "./Sidebar.css";
 function Sidebar({ isDesktopOpen = true, isMobileOpen = false, onMobileClose }){
 
 
-    const permissions = useAuthStore(
-        state => state.permissions
-    );
+    const permissions = adminNavigation;
 
     const location = useLocation();
 
@@ -86,3 +102,4 @@ function Sidebar({ isDesktopOpen = true, isMobileOpen = false, onMobileClose }){
 
 
 export default Sidebar;
+
