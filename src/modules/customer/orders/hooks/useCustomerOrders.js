@@ -1,32 +1,5 @@
 import { useEffect, useState } from "react";
-import { getCustomerOrders } from "../services/customerOrdersService";
-import { listMyOrdersByPhone } from "../../checkout/services/orderGateway";
-import { getCustomerProfile } from "../../checkout/services/checkoutCustomerService";
+import { customerStorage } from "../../services/customerStorage";
+import { createV1CustomerAccessSession, listV1CustomerHistory } from "../../checkout/services/orderGateway";
 import { getOrdersByTableNumber } from "../../../table/services/tableOrdersService";
-import { getActiveTableOrder } from "../../../table/services/tableGateway";
-
-export function useCustomerOrders({ tableMode, tableNumber }) {
-  const [orders, setOrders] = useState([]);
-  useEffect(() => {
-    if (tableMode) {
-      const local = getOrdersByTableNumber(tableNumber);
-      setOrders(local);
-      const token = sessionStorage.getItem(`404_table_token_${tableNumber}`) || "";
-      getActiveTableOrder(tableNumber, token).then((remote) => {
-        if (remote) setOrders((current) => [remote, ...current.filter((item) => item.id !== remote.id)]);
-      }).catch(() => {});
-      return undefined;
-    }
-    const profile = getCustomerProfile();
-    setOrders(getCustomerOrders());
-    if (!profile.phone) return undefined;
-    const load = () => listMyOrdersByPhone(profile.phone).then((remote) => {
-      if (!remote.length) return;
-      setOrders((current) => [...remote, ...current.filter((local) => !remote.some((item) => String(item.orderNumber) === String(local.orderNumber)))]);
-    }).catch(() => {});
-    load();
-    const timer = window.setInterval(load, 30_000);
-    return () => window.clearInterval(timer);
-  }, [tableMode, tableNumber]);
-  return orders;
-}
+export function useCustomerOrders({ tableMode, tableNumber, page = 1 }) { const [orders, setOrders] = useState([]); useEffect(() => { let alive = true; if (tableMode) { setOrders(getOrdersByTableNumber(tableNumber)); return undefined; } const load = async () => { let session = customerStorage.loadAccessSession(); if (!session?.customerAccessToken) { const last = customerStorage.listOrderAccess().at(-1); if (last?.orderActionToken) session = await createV1CustomerAccessSession(last.orderNumber, last.orderActionToken); } if (!session?.customerAccessToken) { if (alive) setOrders([]); return; } const result = await listV1CustomerHistory(page); if (alive) setOrders((result.items || []).map((x) => ({ ...x, id: x.orderNumber, pricing: { total: Number(x.total) }, status: String(x.status).toLowerCase(), trackingToken: customerStorage.getOrderAccess(x.orderNumber)?.trackingReadToken || "" }))); }; load().catch(() => alive && setOrders([])); return () => { alive = false; }; }, [tableMode, tableNumber, page]); return orders; }

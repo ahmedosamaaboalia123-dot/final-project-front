@@ -117,13 +117,17 @@ apiClient.interceptors.response.use(
     if(error.response?.status === 401 && !isAuthRequest && refreshToken && !originalRequest?._retry){
         originalRequest._retry = true;
         if(!refreshPromise){
-            refreshPromise = axios.post(`${appConfig.apiBaseUrl}/auth/refresh`, { refreshToken })
+            const refreshBase = String(appConfig.apiBaseUrl).replace(/\/+$/, "");
+            const refreshUrl = /\/v1$/i.test(refreshBase) ? `${refreshBase}/auth/refresh` : `${refreshBase}/v1/auth/refresh`;
+            refreshPromise = axios.post(refreshUrl, { refreshToken })
                 .then((response) => {
-                    const tokens = response.data?.data || response.data;
-                    localStorage.setItem(appConfig.tokenKey, tokens.access_token);
-                    localStorage.setItem(appConfig.refreshTokenKey, tokens.refresh_token);
-                    updateAdminSocketToken(tokens.access_token);
-                    return tokens.access_token;
+                    const tokens = response.data?.data;
+                    if (!response.data?.ok || !tokens?.accessToken || !tokens?.refreshToken) throw new Error("Refresh response is incomplete");
+                    localStorage.setItem(appConfig.tokenKey, tokens.accessToken);
+                    localStorage.setItem(appConfig.refreshTokenKey, tokens.refreshToken);
+                    useAuthStore.getState().setAccessToken(tokens.accessToken);
+                    updateAdminSocketToken(tokens.accessToken);
+                    return tokens.accessToken;
                 })
                 .finally(() => { refreshPromise = null; });
         }

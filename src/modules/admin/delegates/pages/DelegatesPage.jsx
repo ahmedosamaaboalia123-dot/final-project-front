@@ -1,98 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect,useRef,useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Truck } from "lucide-react";
+import { Plus,Search,Truck } from "lucide-react";
+import { beginOperation,finishOperation } from "@/api/idempotency";
+import { ServerPagination } from "@/shared/components";
 import PageHeader from "@/shared/components/PageHeader/PageHeader";
-import apiClient from "@/services/apiClient";
-import { getAdminSocket } from "@/services/realtime";
+import { deliveryApi } from "../api/delivery.api";
 import "./DelegatesPage.css";
-
-const statusText = { AVAILABLE: "متاح", UNAVAILABLE: "غير متاح" };
-
-export default function DelegatesPage() {
-  const navigate = useNavigate();
-  const [delegates, setDelegates] = useState([]);
-  const [form, setForm] = useState({ name: "", phone: "", whatsapp: "" });
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const res = await apiClient.get("/delegates", { params: { page: 1, pageSize: 30 } });
-      setDelegates(res?.data || []);
-      setError("");
-    } catch (e) { setError(e.response?.data?.message || e.message); }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const socket = getAdminSocket();
-    const onOrderUpdated = (payload) => { if (payload?.order?.delegateId) load(); };
-    socket.on("order:updated", onOrderUpdated);
-    return () => socket.off("order:updated", onOrderUpdated);
-  }, [load]);
-
-  const create = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      await apiClient.post("/delegates", form);
-      setForm({ name: "", phone: "", whatsapp: "" });
-      await load();
-    } catch (e) { setError(e.response?.data?.message || e.message); } finally { setSaving(false); }
-  };
-
-  const openDelegate = (id) => navigate(`/admin/delegates/${id}`);
-
-  return (
-    <div className="delegates-page">
-      <PageHeader title="المناديب" breadcrumbs={["الإدارة", "المناديب"]} icon={Truck} />
-      <div className="delegates-content">
-        <form className="delegate-form" onSubmit={create}>
-          <h2><Plus size={20} /> إضافة مندوب</h2>
-          <input required placeholder="اسم المندوب" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input required placeholder="رقم الهاتف" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <input required placeholder="رقم واتساب" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
-          <button disabled={saving}>{saving ? "جاري الحفظ..." : "إضافة المندوب"}</button>
-        </form>
-
-        {error && <p className="delegates-error" role="alert">{error}</p>}
-
-        <section className="delegates-list">
-          <div className="delegates-list__header">
-            <h2>قائمة المناديب</h2>
-            <span>{Array.isArray(delegates) ? delegates.length : 0} مندوب</span>
-          </div>
-          <div className="delegates-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>المندوب</th>
-                  <th>الهاتف</th>
-                  <th>واتساب</th>
-                  <th>الطلبات</th>
-                  <th>الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.isArray(delegates) && delegates.map((delegate) => (
-                  <tr key={delegate.id} className="delegates-row" onClick={() => openDelegate(delegate.id)}>
-                    <td>{delegate.name}</td>
-                    <td>{delegate.phone}</td>
-                    <td>{delegate.whatsapp}</td>
-                    <td>{delegate._count?.orders || 0}</td>
-                    <td>
-                      <span className={`delegate-status delegate-status--${(delegate.status || "").toLowerCase()}`}>
-                        {statusText[delegate.status] || delegate.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
+const msg=e=>e?.response?.data?.error?.messageAr||e?.response?.data?.message||e.message;
+export default function DelegatesPage(){const nav=useNavigate(),scope=useRef("delegate:create");const[form,setForm]=useState({name:"",phone:"",maxActiveOrders:5}),[page,setPage]=useState(1),[search,setSearch]=useState(""),[data,setData]=useState({delegates:[],pageMeta:{}}),[error,setError]=useState(""),[saving,setSaving]=useState(false);const load=async()=>{try{setData(await deliveryApi.screen({page,limit:10,search:search.trim()||undefined}));setError("");}catch(e){setError(msg(e));}};useEffect(()=>{const t=setTimeout(load,250);return()=>clearTimeout(t);},[page,search]);const create=async e=>{e.preventDefault();setSaving(true);try{await deliveryApi.createDelegate({...form,maxActiveOrders:Number(form.maxActiveOrders)},beginOperation(scope.current));finishOperation(scope.current);setForm({name:"",phone:"",maxActiveOrders:5});await load();}catch(x){setError(msg(x));}finally{setSaving(false);}};return <div className="delegates-page"><PageHeader title="المناديب" breadcrumbs={["الإدارة","المناديب"]} icon={Truck}/><div className="delegates-content"><form className="delegate-form" onSubmit={create}><h2><Plus/> إضافة مندوب</h2><input required minLength={2} placeholder="اسم المندوب" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/><input required minLength={7} placeholder="رقم الهاتف وواتساب" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/><input type="number" min="1" max="100" value={form.maxActiveOrders} onChange={e=>setForm({...form,maxActiveOrders:e.target.value})}/><button disabled={saving}>{saving?"جاري الحفظ...":"إضافة المندوب"}</button></form>{error&&<p role="alert" className="delegates-error">{error}</p>}<section className="delegates-list"><div className="delegates-list__header"><h2>قائمة المناديب ({data.summary?.total??0})</h2><label><Search size={16}/><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} placeholder="بحث"/></label></div><div className="delegates-table-wrap"><table><thead><tr><th>المندوب</th><th>الهاتف</th><th>النشط</th><th>تم التوصيل</th><th>السعة</th><th>الحالة</th></tr></thead><tbody>{(data.delegates||[]).map(d=><tr key={d.id} onClick={()=>nav(`/admin/delegates/${d.id}`)}><td>{d.name}</td><td>{d.phone}</td><td>{d.activeOrderCount}</td><td>{d.deliveredCount}</td><td>{d.activeOrderCount}/{d.maxActiveOrders}</td><td>{d.status}</td></tr>)}</tbody></table></div><ServerPagination meta={data.pageMeta} label="مندوب" onPageChange={setPage}/></section></div></div>}

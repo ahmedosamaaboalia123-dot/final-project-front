@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CheckCircle2, Coffee, Minus, Plus, Trash2 } from "lucide-react";
 import PageHeader from "@/shared/components/PageHeader/PageHeader";
-import { createAdminOnlineOrder, createAdminTableOrder } from "../services/adminOrdersGateway";
+import { useAddSessionItems, useCreateOrder, useOpenTableOrder } from "../hooks/order.mutations";
+import { ordersApi } from "../api/orders.api";
 import { getProductCatalog, getProductsForSection } from "../services/adminProductsService";
 import "../styles/SalesPage.css";
 
@@ -21,6 +22,11 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(true);
 
   const isTable = type === "table";
+  const [tableContext, setTableContext] = useState(null);
+  const tableNumber = tableContext?.table?.tableNumber;
+  const createOrder = useCreateOrder();
+  const openTableOrder = useOpenTableOrder();
+  const addSessionItems = useAddSessionItems();
 
   useEffect(() => {
     let cancelled = false;
@@ -40,6 +46,11 @@ export default function SalesPage() {
       });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!isTable) return;
+    ordersApi.table(id).then(async (context) => context.session?.id ? { ...context, ...(await ordersApi.session(context.session.id)) } : context).then(setTableContext).catch((e) => setError(e.response?.data?.error?.messageAr || e.message));
+  }, [id, isTable]);
 
   const visible = useMemo(
     () => (activeSection ? getProductsForSection(products, activeSection) : products),
@@ -80,30 +91,27 @@ export default function SalesPage() {
   const confirm = async () => {
     if (!invoice.length || saving) return;
     if (!isTable && (!customer.name.trim() || !customer.phone.trim() || (fulfillmentType === "DELIVERY" && !customer.address.trim()))) {
-      setError("الاسم ورقم الهاتف مطلوبان، والعنوان مطلوب عند اختيار التوصيل");
+      setError("أكمل اسم العميل ورقم الهاتف (والعنوان للتوصيل).");
       return;
     }
-    const idempotencyKey = typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setSaving(true);
     setError("");
     try {
-      const order = isTable
-        ? await createAdminTableOrder({ tableNumber: Number(id), items: invoice }, idempotencyKey)
-        : await createAdminOnlineOrder({
-            ...customer,
-            customerName: customer.name,
-            fulfillmentType,
-            items: invoice,
-          }, idempotencyKey);
+      const items = invoice.map((line) => ({ productId: String(line.productId), productSizeId: String(line.productSizeId), quantity: Number(line.qty) || 1 }));
       if (isTable) {
+        if (tableContext?.session?.id) {
+          await addSessionItems.mutateAsync({ sessionId: tableContext.session.id, body: { items, expectedSessionVersion: tableContext.session.version, expectedOrderVersion: tableContext.order.version } });
+        } else {
+          await openTableOrder.mutateAsync({ tableId: id, body: { items, expectedTableVersion: tableContext?.table?.version } });
+        }
         navigate(`/admin/orders/tables/${id}`, { replace: true });
       } else {
+        const mode = fulfillmentType === "PICKUP" ? "TAKEAWAY" : fulfillmentType;
+        await createOrder.mutateAsync({ fulfillmentType: mode, customer: { name: customer.name.trim(), phone: customer.phone.trim(), ...(mode === "DELIVERY" ? { address: customer.address.trim() } : {}) }, items });
         navigate(type === "takeaway" ? "/admin/orders/takeaway" : "/admin/orders/online", { replace: true });
       }
     } catch (e) {
-      setError(e.response?.data?.message || e.message);
+      setError(e.response?.data?.error?.messageAr || e.response?.data?.message || e.message);
     } finally {
       setSaving(false);
     }
@@ -112,7 +120,7 @@ export default function SalesPage() {
   return (
     <div className="sales-page">
       <PageHeader
-        title={isTable ? `بيع - طاولة ${id}` : "طلب أونلاين"}
+        title={isTable ? `بيع - طاولة ${tableNumber ?? "..."}` : "طلب أونلاين"}
         breadcrumbs={["الطلبات", "صفحة البيع"]}
       />
 
@@ -216,7 +224,7 @@ export default function SalesPage() {
           </div>
           <button
             className="btn-confirm-invoice"
-            disabled={saving || !invoice.length}
+            disabled={saving || !invoice.length || (isTable && !tableContext)}
             onClick={confirm}
           >
             <CheckCircle2 size={16} />

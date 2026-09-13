@@ -16,6 +16,7 @@ function UserMenu(){
 
 const navigate = useNavigate();
 const clearAuth = useAuthStore(state => state.clearAuth);
+const currentAttendance = useAuthStore(state => state.currentAttendance);
 const checkOut = useCheckOut();
 const checkOutTime = checkOut.data?.checkOutAt
     ? new Date(checkOut.data.checkOutAt).toLocaleTimeString("ar-EG", {
@@ -26,8 +27,10 @@ const checkOutTime = checkOut.data?.checkOutAt
 
 const registerCheckOut = () => {
     if (checkOut.isPending) return;
+    const attendanceId = currentAttendance?.id;
+    if (!attendanceId) { window.alert("لا يوجد حضور مفتوح لتسجيل الانصراف"); return; }
     if (!window.confirm("هل تريد تسجيل الانصراف الآن؟")) return;
-    checkOut.mutate();
+    checkOut.mutate(String(attendanceId));
 };
 
 const logout = async () => {
@@ -35,7 +38,6 @@ const logout = async () => {
     try { if (refreshToken) await authService.logout(refreshToken); } catch { /* Local logout must always finish. */ }
     localStorage.removeItem(appConfig.tokenKey);
     localStorage.removeItem(appConfig.refreshTokenKey);
-    localStorage.removeItem("auth_session");
     clearAuth();
     disconnectAdminSocket();
     navigate("/login", { replace: true });
@@ -52,8 +54,6 @@ const role = useAuthStore(
 );
 
 
-if (!employee) return <div className="user-menu"><h4>لوحة الإدارة</h4></div>;
-
 return (
 
 <div className="user-menu">
@@ -68,7 +68,7 @@ return (
 
 
 <span>
-{role?.display_name}
+{role?.name}
 </span>
 
 
@@ -99,6 +99,7 @@ return (
 
 
 export default UserMenu;
+
 
 
 

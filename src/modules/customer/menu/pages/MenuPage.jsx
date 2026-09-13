@@ -10,10 +10,10 @@ import MenuFloatingCartBar from "../components/MenuFloatingCartBar";
 import ProductDetailsModal from "../../product-details/components/ProductDetailsModal";
 import OrderCheckoutModal from "../../checkout/components/OrderCheckoutModal";
 import OrderSuccessModal from "../../checkout/components/OrderSuccessModal";
-import { createPublicOrder } from "../../checkout/services/orderGateway";
+import { useCreatePublicOrder } from "../../checkout/hooks/useCreatePublicOrder";
 import { getPublicMenu, getPublicCategories, getTopProducts, isCatalogFromBackend } from "@/services/catalogService";
-import { setLastOrder, saveCustomerProfile } from "../../checkout/services/checkoutCustomerService";
-import { saveBackendOrder } from "../../orders/services/customerOrdersService";
+import { customerOrdersApi } from "../../api/customerOrders.api";
+import { customerStorage } from "../../services/customerStorage";
 
 // Shared/Main page modals for seamless full functionality
 import CartDrawer from "../../main-page/components/CartDrawer";
@@ -48,10 +48,12 @@ function buildCatalogCategories(items = []) {
 }
 
 export default function MenuPage({ tableMode = false, tableNumberOverride, onTableRequestWaiter }) {
+  const createOrder = useCreatePublicOrder();
   const navigate = useNavigate();
   const { tableId } = useParams();
   const tableNumber = Number(tableNumberOverride || tableId) || 4;
   const [queryParams] = useSearchParams();
+  const addToOrderNumber = queryParams.get("addTo");
   const homePath = tableMode ? `/table/${tableNumber}` : "/";
   const menuPath = tableMode ? `/table/${tableNumber}/menu` : "/menu";
   const ordersPath = tableMode ? `/table/${tableNumber}/orders` : "/customer/orders";
@@ -231,29 +233,15 @@ export default function MenuPage({ tableMode = false, tableNumberOverride, onTab
   };
 
   const handleCreateOrder = async (checkoutData) => {
-    const order = await createPublicOrder(checkoutData);
-    const orderNumber = order?.orderNumber || order?.publicCode || order?.id || "";
-    const trackingToken = order?.trackingToken || "";
-    const customerName = order?.customerName || checkoutData?.customer?.name || "";
-    const customerPhone = order?.phone || checkoutData?.customer?.phone || "";
-    const fulfillmentType = order?.fulfillmentType || checkoutData?.fulfillmentType || "";
-    const total = Number(order?.total ?? checkoutData?.total ?? 0) || 0;
-    const createdAt = order?.createdAt || new Date().toISOString();
-    setLastOrder({ orderNumber: String(orderNumber), trackingToken, phone: String(customerPhone || ""), fulfillmentType, total, createdAt });
-    if (checkoutData?.customer?.phone) {
-      saveCustomerProfile({ name: checkoutData.customer.name || "", phone: checkoutData.customer.phone || "" });
+    if (addToOrderNumber) {
+      const access = customerStorage.getOrderAccess(addToOrderNumber);
+      if (!access?.orderActionToken || !access?.trackingReadToken) throw new Error("رمز تعديل الطلب غير متاح على هذا الجهاز");
+      const tracking = await customerOrdersApi.tracking(addToOrderNumber, access.trackingReadToken);
+      const bodyItems = checkoutData.items.map((item) => ({ productId: String(item.originalId || item.productId || item.id), productSizeId: String(item.productSizeId || item.customizations?.sizeId), quantity: Number(item.quantity) || 1 }));
+      await customerOrdersApi.addItems(addToOrderNumber, { items: bodyItems, expectedVersion: Number(tracking.version ?? tracking.eventSequence ?? 0) }, access.orderActionToken, globalThis.crypto?.randomUUID?.() || String(Date.now()));
+      setIsCheckoutOpen(false); setCartItems([]); navigate(`/customer/orders/${encodeURIComponent(addToOrderNumber)}/track`); return;
     }
-    saveBackendOrder({
-      orderNumber: String(orderNumber),
-      trackingToken,
-      phone: String(customerPhone || ""),
-      name: customerName || checkoutData?.customer?.name || "",
-      fulfillmentType,
-      total,
-      status: "PENDING",
-      statusText: "بانتظار التأكيد",
-      items: order?.items || checkoutData?.items || [],
-    });
+    const order = await createOrder.mutateAsync(checkoutData);
     setIsCheckoutOpen(false);
     setCompletedOrder(order);
     setCartItems([]);
@@ -506,6 +494,7 @@ export default function MenuPage({ tableMode = false, tableNumberOverride, onTab
             items={cartItems}
             onClose={() => setIsCheckoutOpen(false)}
             onSubmit={handleCreateOrder}
+            addToExistingOrder={Boolean(addToOrderNumber)}
           />
           <OrderSuccessModal
             order={completedOrder}

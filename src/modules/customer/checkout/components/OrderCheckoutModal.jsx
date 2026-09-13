@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Bike, MapPin, PackageCheck, Phone, UserRound, X } from "lucide-react";
 import { ORDER_FULFILLMENT } from "../services/orderGateway";
 import { getCustomerProfile, saveCustomerProfile } from "../services/checkoutCustomerService";
+import { customerStorage } from "../../services/customerStorage";
 import "../styles/Checkout.css";
 
 const EMPTY_CUSTOMER = {
@@ -15,7 +16,7 @@ const EMPTY_CUSTOMER = {
   landmark: "",
 };
 
-export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubmit }) {
+export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubmit, addToExistingOrder = false }) {
   const [fulfillmentType, setFulfillmentType] = useState(ORDER_FULFILLMENT.TAKEAWAY_PICKUP);
   const [customer, setCustomer] = useState(EMPTY_CUSTOMER);
   const [errors, setErrors] = useState({});
@@ -25,8 +26,8 @@ export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubm
   // so the customer's last-used details are ready without re-typing.
   useEffect(() => {
     if (isOpen) {
-      const profile = getCustomerProfile();
-      setCustomer((current) => ({ ...current, name: profile.name || current.name, phone: profile.phone || current.phone }));
+      const profile = { ...getCustomerProfile(), ...customerStorage.loadProfile() };
+      setCustomer((current) => ({ ...current, ...Object.fromEntries(Object.keys(EMPTY_CUSTOMER).map((key) => [key, profile[key] || current[key]])) }));
     }
   }, [isOpen]);
 
@@ -45,6 +46,7 @@ export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubm
   };
 
   const validate = () => {
+    if (addToExistingOrder) return items.length > 0;
     const nextErrors = {};
     if (customer.name.trim().length < 2) nextErrors.name = "اكتب الاسم بشكل صحيح";
     if (!/^01\d{9}$/.test(customer.phone.trim())) nextErrors.phone = "رقم الهاتف يجب أن يكون 11 رقمًا";
@@ -65,7 +67,7 @@ export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubm
       await onSubmit({ fulfillmentType, customer, items });
       // Save the customer's details so the tracking search + next checkout
       // auto-fill. Keep the data on screen (do not clear the form).
-      saveCustomerProfile({ name: customer.name.trim(), phone: customer.phone.trim() });
+      if (!addToExistingOrder) saveCustomerProfile({ name: customer.name.trim(), phone: customer.phone.trim() });
       setErrors({});
     } finally {
       setIsSubmitting(false);
@@ -94,7 +96,7 @@ export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubm
           <button type="button" className="checkout-close-btn" onClick={onClose} aria-label="إغلاق"><X size={20} /></button>
         </header>
 
-        <div className="checkout-type-grid">
+        {!addToExistingOrder && <div className="checkout-type-grid">
           <button type="button" className={fulfillmentType === ORDER_FULFILLMENT.TAKEAWAY_PICKUP ? "active" : ""} onClick={() => setFulfillmentType(ORDER_FULFILLMENT.TAKEAWAY_PICKUP)}>
             <PackageCheck size={22} />
             <strong>تيك أواي</strong>
@@ -105,9 +107,9 @@ export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubm
             <strong>أونلاين</strong>
             <span>توصيل إلى عنوانك</span>
           </button>
-        </div>
+        </div>}
 
-        <div className="checkout-form-grid">
+        {!addToExistingOrder && <div className="checkout-form-grid">
           {field("name", "الاسم", "اكتب اسمك", UserRound)}
           {field("phone", "رقم الهاتف", "01xxxxxxxxx", Phone)}
           {fulfillmentType === ORDER_FULFILLMENT.ONLINE_DELIVERY && (
@@ -120,16 +122,15 @@ export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubm
               {field("landmark", "علامة مميزة (اختياري)", "بجوار المحطة")}
             </>
           )}
-        </div>
+        </div>}
 
         <footer className="checkout-footer">
           <div className="checkout-total"><span>الإجمالي</span><strong>{total} ج.م</strong>{deliveryFee > 0 && <small>يشمل {deliveryFee} ج.م توصيل</small>}</div>
           <button type="button" className="checkout-primary-btn" disabled={isSubmitting} onClick={handleSubmit}>
-            {isSubmitting ? "جاري تأكيد الطلب..." : "تأكيد وإنشاء الطلب"}
+            {isSubmitting ? "جاري الحفظ..." : addToExistingOrder ? "إضافة المنتجات للطلب" : "تأكيد وإنشاء الطلب"}
           </button>
         </footer>
       </section>
     </div>
   );
 }
-

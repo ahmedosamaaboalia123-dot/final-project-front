@@ -1,54 +1,71 @@
-﻿import { useEffect, useState } from "react";
-import { Edit2, ImagePlus, Plus, Save, Trash2, X } from "lucide-react";
-import { appConfig } from "@/app/config";
+﻿import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/shared/components/PageHeader/PageHeader";
-import useProducts from "../hooks/useProducts";
+import { useAuthStore } from "@/store/authStore";
+import { can } from "@/modules/auth/permissions/permission";
+import { useRealtimeRoom } from "@/realtime/useRealtimeRoom";
+import { queryKeys } from "@/api/queryKeys";
+import ProductsTable from "../components/ProductsTable";
+import ProductWizard from "../components/ProductWizard";
+import CategoryManager from "../components/CategoryManager";
+import ProductDetails from "../components/ProductDetails";
 import "./ProductsPage.css";
 
-const empty = () => ({ id: null, name: "", description: "", image: "", imageFile: null, imagePreview: "", categoryId: "", isActive: true, types: [{ name: "", ingredients: [] }], sizes: [], addons: [] });
-const ingredient = (row) => ({ rawMaterialId: Number(row.rawMaterialId), quantity: String(row.quantity), unit: row.unit });
-const apiOrigin = new URL(appConfig.apiBaseUrl, window.location.origin).origin;
-const imageSrc = (value) => !value ? "" : /^https?:\/\//i.test(value) ? value : `${apiOrigin}${value}`;
-
-function RecipeEditor({ value, onChange, materials }) {
-  const add = () => { const material = materials.find((m) => !value.some((x) => Number(x.rawMaterialId) === m.id)); if (material) onChange([...value, { rawMaterialId: material.id, quantity: "0", unit: material.unit }]); };
-  const update = (index, rawMaterialId) => { const material = materials.find((m) => m.id === Number(rawMaterialId)); onChange(value.map((row, i) => i === index ? { rawMaterialId: Number(rawMaterialId), quantity: "0", unit: material?.unit || "" } : row)); };
-  return <div className="recipe-editor"><div className="recipe-editor__head"><span>مواد النوع بدون كميات</span><button type="button" onClick={add}><Plus size={13}/>مادة</button></div>{value.map((row, index) => <div className="type-material-row" key={index}><select value={row.rawMaterialId} onChange={(e) => update(index, e.target.value)}><option value="">اختر المادة</option>{materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select><span>{materials.find((m) => m.id === Number(row.rawMaterialId))?.unit || row.unit}</span><button type="button" className="icon-danger" onClick={() => onChange(value.filter((_, i) => i !== index))}><X size={14}/></button></div>)}</div>;
-}
-
-function SizeIngredients({ type, value, onChange, materials }) {
-  const allowed = type?.ingredients || [];
-  const update = (source, quantity) => {
-    const existing = value.find((row) => Number(row.rawMaterialId) === Number(source.rawMaterialId));
-    const next = value.filter((row) => Number(row.rawMaterialId) !== Number(source.rawMaterialId));
-    if (quantity !== "") next.push({ rawMaterialId: Number(source.rawMaterialId), quantity, unit: source.unit });
-    onChange(next);
-  };
-  if (!type || !allowed.length) return <div className="compact-empty">أضف مواد خام للنوع أولًا.</div>;
-  return <div className="size-materials-grid">{allowed.map((source) => { const material = materials.find((m) => m.id === Number(source.rawMaterialId)); const row = value.find((x) => Number(x.rawMaterialId) === Number(source.rawMaterialId)); return <label key={source.rawMaterialId}><span>{material?.name || "مادة"} <small>{source.unit}</small></span><input type="number" min="0.001" step="any" placeholder="كمية الحجم" value={row?.quantity || ""} onChange={(e) => update(source, e.target.value)}/></label>; })}</div>;
-}
-
 export default function ProductsPage() {
-  const { products, materials, categories, query, categoryMutation, saveMutation, deleteMutation } = useProducts();
-  const [form, setForm] = useState(empty), [tab, setTab] = useState("list"), [localError, setLocalError] = useState("");
-  const [categoryName, setCategoryName] = useState("");
-  const requestError = query.error || categoryMutation.error || saveMutation.error || deleteMutation.error;
-  const error = localError || requestError?.response?.data?.message || requestError?.message || "";
-  const loading = saveMutation.isPending;
-  const addCategory = async () => { if (!categoryName.trim()) return; setLocalError(""); try { const result = await categoryMutation.mutateAsync(categoryName.trim()); setForm((old) => ({ ...old, categoryId: String(result.data.id) })); setCategoryName(""); } catch { /* Mutation error is rendered above. */ } };
-  const selectImage = (file) => { if (!file) return; setLocalError(""); setForm((old) => ({ ...old, imageFile:file, imagePreview:URL.createObjectURL(file) })); };
-  const edit = (p) => { setForm({ id: p.id, name: p.name, description: p.description || "", image: p.image || "", imageFile:null, imagePreview:"", categoryId: String(p.categoryId || p.categoryRef?.id || ""), isActive: p.isActive, types: p.types.map((t) => ({ id: t.id, name: t.name, ingredients: t.ingredients.map(ingredient) })), sizes: p.sizes.map((s) => ({ id: s.id, typeName: s.typeName, name: s.name, sellingPrice: String(s.sellingPrice ?? s.finalPrice ?? ""), costPrice:Number(s.costPrice||0), profit:Number(s.profit||0), profitMargin:Number(s.profitMargin||0), ingredients: s.ingredients.map(ingredient), isActive: s.isActive })), addons: p.addons.map((a) => ({ id: a.id, name: a.name, price: String(a.price), notes: a.notes || "", ingredients: [] })) }); setTab("edit"); };
-  const save = async () => { setLocalError(""); try { await saveMutation.mutateAsync(form); setForm(empty()); setTab("list"); } catch { /* Mutation error is rendered above. */ } };
-  const remove = async (id) => { if (!confirm("حذف المنتج؟")) return; setLocalError(""); try { await deleteMutation.mutateAsync(id); } catch { /* Mutation error is rendered above. */ } };
-  const patchType = (index, data) => setForm((old) => ({ ...old, types: old.types.map((row, i) => i === index ? { ...row, ...data } : row) }));
-  return <div className="products-page"><PageHeader title="المنتجات والوصفات" breadcrumbs={["الإدارة", "المنتجات"]}/><div className="products-page-container">{error && <div className="products-error">{error}</div>}<div className="products-subtabs-bar"><button className={`subtab-btn ${tab === "list" ? "active" : ""}`} onClick={() => setTab("list")}>قائمة المنتجات</button><button className={`subtab-btn ${tab === "edit" ? "active" : ""}`} onClick={() => { setForm(empty()); setTab("edit"); }}>إضافة منتج</button></div>
-  {tab === "list" ? <section className="products-section-card"><div className="section-card-header"><div><h3>المنتجات المسجلة</h3><small>{products.length} منتج بكل الأنواع والأحجام</small></div><button className="section-add-btn" onClick={() => { setForm(empty()); setTab("edit"); }}><Plus size={14}/>منتج</button></div><div className="products-table-wrapper"><table className="products-custom-table"><thead><tr><th>الصورة</th><th>المنتج</th><th>القسم</th><th>الأنواع</th><th>الأحجام</th><th>الإضافات</th><th>أقل تكلفة</th><th>أقل سعر بيع</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{products.map((p) => <tr key={p.id}><td>{p.image ? <img className="product-list-image" src={imageSrc(p.image)} alt=""/> : "—"}</td><td><strong>{p.name}</strong></td><td>{p.categoryRef?.name || p.category}</td><td>{p.types.length}</td><td>{p.sizes.length}</td><td>{p.addons.length}</td><td>{p.sizes.length ? Math.min(...p.sizes.map((s) => Number(s.costPrice||0))).toFixed(2) : "—"}</td><td>{p.sizes.length ? Math.min(...p.sizes.map((s) => Number(s.sellingPrice ?? s.finalPrice ?? 0))).toFixed(2) : "—"}</td><td>{p.isActive ? "ظاهر" : "متوقف"}</td><td><div className="product-actions"><button onClick={() => edit(p)}><Edit2 size={14}/></button><button className="icon-danger" onClick={() => remove(p.id)}><Trash2 size={14}/></button></div></td></tr>)}</tbody></table></div></section> : <div className="product-config-form">
-    <section className="products-section-card category-creator"><div><h3>1. الأقسام</h3><small>أنشئ القسم ثم استخدمه من القائمة</small></div><div><input placeholder="اسم القسم الجديد" value={categoryName} onChange={(e) => setCategoryName(e.target.value)}/><button onClick={addCategory}><Plus size={14}/>حفظ القسم</button></div></section>
-    <section className="products-section-card"><div className="section-card-header"><div><h3>2. بيانات المنتج</h3><small>الاسم والصورة والقسم والظهور في القائمة</small></div></div><div className="product-basic-layout"><label className="product-image-uploader">{form.imagePreview || form.image ? <img src={form.imagePreview || imageSrc(form.image)} alt="معاينة"/> : <ImagePlus/>}<span>{form.imageFile ? "تم اختيار الصورة — تُرفع عند الحفظ" : "اختيار صورة المنتج"}</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => selectImage(e.target.files?.[0])}/></label><div className="product-fields"><label>اسم المنتج<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}/></label><label>القسم<select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}><option value="">اختر القسم</option>{categories.map((c) => <option value={c.id} key={c.id}>{c.name}</option>)}</select></label><label className="field-wide">الوصف<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}/></label><label className="checkbox-field"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })}/>ظاهر في القائمة وصفحات البيع</label></div></div></section>
-    <section className="products-section-card"><div className="section-card-header"><div><h3>3. أنواع المنتج</h3><small>اكتب النوع وحدد المواد الخام الداخلة فيه</small></div><button className="section-add-btn" onClick={() => setForm((old) => ({ ...old, types: [...old.types, { name: "", ingredients: [] }] }))}><Plus size={14}/>نوع</button></div>{form.types.map((type, index) => <article className="config-block" key={index}><div className="config-title"><input placeholder="اسم النوع: ساخن / بارد" value={type.name} onChange={(e) => { const previous = type.name; patchType(index, { name: e.target.value }); setForm((old) => ({ ...old, sizes: old.sizes.map((s) => s.typeName === previous ? { ...s, typeName: e.target.value } : s) })); }}/><button className="icon-danger" onClick={() => setForm((old) => ({ ...old, types: old.types.filter((_, i) => i !== index), sizes: old.sizes.filter((s) => s.typeName !== type.name) }))}><Trash2 size={14}/></button></div><RecipeEditor value={type.ingredients} materials={materials} onChange={(ingredients) => patchType(index, { ingredients })}/></article>)}</section>
-    <section className="products-section-card"><div className="section-card-header"><div><h3>4. الأحجام والأسعار</h3><small>سعر البيع تدخله يدويًا، وسعر التكلفة يحسبه الباك من الخامات</small></div><button className="section-add-btn" onClick={() => setForm((old) => ({ ...old, sizes: [...old.sizes, { typeName: old.types[0]?.name || "", name: "", sellingPrice: "", costPrice:0, ingredients: [], isActive: true }] }))}><Plus size={14}/>حجم</button></div>{form.sizes.map((size, index) => { const type = form.types.find((t) => t.name === size.typeName); return <article className="config-block" key={index}><div className="size-fields compact-size-fields"><select value={size.typeName} onChange={(e) => setForm((old) => ({ ...old, sizes: old.sizes.map((row, i) => i === index ? { ...row, typeName: e.target.value, ingredients: [] } : row) }))}><option value="">اختر النوع</option>{form.types.filter((t) => t.name).map((t) => <option key={t.name}>{t.name}</option>)}</select><input placeholder="اسم الحجم" value={size.name} onChange={(e) => setForm((old) => ({ ...old, sizes: old.sizes.map((row, i) => i === index ? { ...row, name: e.target.value } : row) }))}/><input type="number" min="0" step="0.01" placeholder="سعر البيع" value={size.sellingPrice} onChange={(e) => setForm((old) => ({ ...old, sizes: old.sizes.map((row, i) => i === index ? { ...row, sellingPrice: e.target.value } : row) }))}/><input value={`التكلفة: ${Number(size.costPrice||0).toFixed(2)}`} readOnly aria-label="سعر التكلفة المحسوب"/><button className="icon-danger" onClick={() => setForm((old) => ({ ...old, sizes: old.sizes.filter((_, i) => i !== index) }))}><Trash2 size={14}/></button></div><SizeIngredients type={type} value={size.ingredients} materials={materials} onChange={(ingredients) => setForm((old) => ({ ...old, sizes: old.sizes.map((row, i) => i === index ? { ...row, ingredients } : row) }))}/></article>; })}</section>
-    <section className="products-section-card"><div className="section-card-header"><div><h3>5. الإضافات</h3><small>اسم الإضافة وسعرها والمواصفة فقط</small></div><button className="section-add-btn" onClick={() => setForm((old) => ({ ...old, addons: [...old.addons, { name: "", price: "", notes: "", ingredients: [] }] }))}><Plus size={14}/>إضافة</button></div>{form.addons.map((addon, index) => <article className="config-block" key={index}><div className="addon-fields"><input placeholder="اسم الإضافة" value={addon.name} onChange={(e) => setForm((old) => ({ ...old, addons: old.addons.map((row, i) => i === index ? { ...row, name: e.target.value } : row) }))}/><input type="number" min="0" step="0.01" placeholder="السعر" value={addon.price} onChange={(e) => setForm((old) => ({ ...old, addons: old.addons.map((row, i) => i === index ? { ...row, price: e.target.value } : row) }))}/><input placeholder="المواصفة" value={addon.notes} onChange={(e) => setForm((old) => ({ ...old, addons: old.addons.map((row, i) => i === index ? { ...row, notes: e.target.value } : row) }))}/><button className="icon-danger" onClick={() => setForm((old) => ({ ...old, addons: old.addons.filter((_, i) => i !== index) }))}><Trash2 size={14}/></button></div></article>)}</section>
-    <div className="products-actions-footer"><button className="btn-submit-product" disabled={loading} onClick={save}><Save size={15}/>{loading ? "جاري حفظ المنتج والصورة..." : "حفظ المنتج وكل التفاصيل"}</button></div>
-  </div>}</div></div>;
-}
+  const permissions = useAuthStore((state) => state.permissions);
+  // The backend exposes one write permission for the complete products module.
+  // Using products.create here hid the old create forms because that permission
+  // does not exist in the backend contract.
+  const canManage = can(permissions, "products.manage");
+  const [tab, setTab] = useState("list");
+  const [selectedId, setSelectedId] = useState(null);
+  const queryClient = useQueryClient();
 
+  useRealtimeRoom({
+    scope: "products:list",
+    rooms: ["admin:products"],
+    enabled: true,
+    onEvent: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+    },
+  });
+
+  const tabs = [
+    { id: "list", label: "قائمة المنتجات" },
+    ...(canManage ? [{ id: "create", label: "إضافة منتج" }] : []),
+    { id: "categories", label: canManage ? "إضافة قسم والأقسام" : "الأقسام" },
+  ];
+
+  const openDetails = (id) => setSelectedId(String(id));
+  const closeDetails = () => setSelectedId(null);
+
+  const activeTab = tabs.some((item) => item.id === tab) ? tab : "list";
+
+  return (
+    <div className="products-page">
+      <PageHeader
+        title="المنتجات"
+        breadcrumbs={["الإدارة", "المنتجات"]}
+        tabs={selectedId ? [] : tabs}
+        activeTab={activeTab}
+        onTabChange={setTab}
+      />
+      <div className="products-page-container">
+        {selectedId ? (
+          <ProductDetails productId={selectedId} onBack={closeDetails} />
+        ) : activeTab === "create" && canManage ? (
+          <ProductWizard
+            onFinished={(id) => {
+              setSelectedId(String(id));
+              setTab("list");
+            }}
+          />
+        ) : activeTab === "categories" ? (
+          <CategoryManager />
+        ) : (
+          <ProductsTable onOpen={openDetails} />
+        )}
+      </div>
+    </div>
+  );
+}

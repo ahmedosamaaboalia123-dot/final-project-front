@@ -1,5 +1,6 @@
 import { lazy } from "react";
 import { Navigate } from "react-router-dom";
+import ProtectedRoute from "@/routes/ProtectedRoute";
 
 
 
@@ -17,12 +18,12 @@ const EmployeeDetailsPage = lazy(() => import("@/modules/admin/employees/pages/E
 const SuppliersPage = lazy(() => import("@/modules/admin/suppliers/pages/SuppliersPage"));
 const SupplierDetailsPage = lazy(() => import("@/modules/admin/suppliers/pages/SupplierDetailsPage"));
 const WarningsPage = lazy(() => import("@/modules/admin/warnings/pages/WarningsPage"));
+const InvoicesPage = lazy(() => import("@/modules/admin/invoices/pages/InvoicesPage"));
 const ReturnsPage = lazy(() => import("@/modules/admin/returns/pages/ReturnsPage"));
 const DrawerPage = lazy(() => import("@/modules/admin/drawer/pages/DrawerPage"));
 const FinancialReportsPage = lazy(() => import("@/modules/admin/financial-reports/pages/FinancialReportsPage"));
 const OrdersHomePage = lazy(() => import("@/modules/admin/orders/pages/OrdersHomePage"));
 const OnlineScreen = lazy(() => import("@/modules/admin/orders/pages/OnlineScreen"));
-const IncomingOnlineOrdersPage = lazy(() => import("@/modules/admin/orders/pages/IncomingOnlineOrdersPage"));
 const TakeawayScreen = lazy(() => import("@/modules/admin/orders/pages/TakeawayScreen"));
 const TablesScreen = lazy(() => import("@/modules/admin/orders/pages/TablesScreen"));
 const OrderSalesPage = lazy(() => import("@/modules/admin/orders/pages/SalesPage"));
@@ -30,6 +31,8 @@ const BusyCardPage = lazy(() => import("@/modules/admin/orders/pages/BusyCardPag
 const PreparationPage = lazy(() => import("@/modules/admin/orders/pages/PreparationPage"));
 const OrderDetailsPage = lazy(() => import("@/modules/admin/orders/pages/OrderDetailsPage"));
 const OrderHistoryPage = lazy(() => import("@/modules/admin/orders/pages/OrderHistoryPage"));
+const CancellationRequestsPage = lazy(() => import("@/modules/admin/orders/pages/CancellationRequestsPage"));
+const TableProposalsPage = lazy(() => import("@/modules/admin/orders/pages/TableProposalsPage"));
 const TableServicesPage = lazy(() => import("@/modules/admin/orders/pages/TableServicesPage"));
 const TableSummaryPage = lazy(() => import("@/modules/admin/orders/pages/TableSummaryPage"));
 const TableOrderTrackPage = lazy(() => import("@/modules/admin/orders/pages/TableOrderTrackPage"));
@@ -37,6 +40,8 @@ const CustomersPage = lazy(() => import("@/modules/admin/customers/pages/Custome
 const CustomerDetailsPage = lazy(() => import("@/modules/admin/customers/pages/CustomerDetailsPage"));
 const DelegatesPage = lazy(() => import("@/modules/admin/delegates/pages/DelegatesPage"));
 const DelegateDetailsPage = lazy(() => import("@/modules/admin/delegates/pages/DelegateDetailsPage"));
+const AuditPage = lazy(() => import("@/modules/admin/audit/pages/AuditPage"));
+const ReviewsPage = lazy(() => import("@/modules/admin/reviews/pages/ReviewsPage"));
 
 
 
@@ -48,7 +53,7 @@ const adminRoutes = {
     path:"/admin",
 
 
-    element:<LayoutAdmin/>,
+    element:<ProtectedRoute><LayoutAdmin/></ProtectedRoute>,
 
 
     children:[
@@ -65,7 +70,7 @@ const adminRoutes = {
 
             path:"dashboard",
 
-            element:<DashboardPage/>
+            element:<ProtectedRoute pageKey="dashboard"><DashboardPage/></ProtectedRoute>
 
         },
 
@@ -75,7 +80,7 @@ const adminRoutes = {
 
             path:"products",
 
-            element:<ProductsPage/>
+            element:<ProtectedRoute pageKey="products"><ProductsPage/></ProtectedRoute>
 
         },
 
@@ -84,7 +89,7 @@ const adminRoutes = {
 
             path:"inventory",
 
-            element:<InventoryPage/>
+            element:<ProtectedRoute pageKey="inventory"><InventoryPage/></ProtectedRoute>
 
         },
 
@@ -93,7 +98,7 @@ const adminRoutes = {
 
             path:"inventory/:id",
 
-            element:<MaterialDetailsPage/>
+            element:<ProtectedRoute pageKey="inventory"><MaterialDetailsPage/></ProtectedRoute>
 
         },
 
@@ -102,7 +107,7 @@ const adminRoutes = {
 
             path:"warnings",
 
-            element:<WarningsPage/>
+            element:<ProtectedRoute pageKey="warnings"><WarningsPage/></ProtectedRoute>
 
         },
 
@@ -111,7 +116,7 @@ const adminRoutes = {
 
             path:"invoices",
 
-            element:<PurchasesPage/>
+            element:<ProtectedRoute pageKey="orders"><InvoicesPage/></ProtectedRoute>
 
         },
 
@@ -120,7 +125,7 @@ const adminRoutes = {
 
             path:"purchases",
 
-            element:<PurchasesPage/>
+            element:<ProtectedRoute pageKey="purchases"><PurchasesPage/></ProtectedRoute>
 
         },
 
@@ -129,7 +134,7 @@ const adminRoutes = {
 
             path:"employees",
 
-            element:<EmployeesPage/>
+            element:<ProtectedRoute pageKey="employees"><EmployeesPage/></ProtectedRoute>
 
         },
 
@@ -138,7 +143,7 @@ const adminRoutes = {
 
             path:"employees/:id",
 
-            element:<EmployeeDetailsPage/>
+            element:<ProtectedRoute pageKey="employees"><EmployeeDetailsPage/></ProtectedRoute>
 
         },
 
@@ -147,7 +152,7 @@ const adminRoutes = {
 
             path:"suppliers",
 
-            element:<SuppliersPage/>
+            element:<ProtectedRoute pageKey="suppliers"><SuppliersPage/></ProtectedRoute>
 
         },
 
@@ -156,7 +161,7 @@ const adminRoutes = {
 
             path:"suppliers/:id",
 
-            element:<SupplierDetailsPage/>
+            element:<ProtectedRoute pageKey="suppliers"><SupplierDetailsPage/></ProtectedRoute>
 
         },
 
@@ -165,7 +170,7 @@ const adminRoutes = {
 
             path:"returns",
 
-            element:<ReturnsPage/>
+            element:<ProtectedRoute pageKey="purchase-returns"><ReturnsPage/></ProtectedRoute>
 
         },
 
@@ -174,15 +179,17 @@ const adminRoutes = {
 
             path:"drawer",
 
-            element:<DrawerPage/>
+            element:<ProtectedRoute pageKey="drawer"><DrawerPage/></ProtectedRoute>
 
         },
-        { path:"financial-reports", element:<FinancialReportsPage/> },
+        { path:"financial-reports", element:<ProtectedRoute pageKey="reports"><FinancialReportsPage/></ProtectedRoute> },
+        { path:"audit", element:<ProtectedRoute pageKey="audit"><AuditPage/></ProtectedRoute> },
+        { path:"reviews", element:<ProtectedRoute pageKey="reviews"><ReviewsPage/></ProtectedRoute> },
         {
             path:"delegates",
             children: [
-                { index: true, element: <DelegatesPage/> },
-                { path: ":id", element: <DelegateDetailsPage/> },
+                { index: true, element: <ProtectedRoute pageKey="delegates"><DelegatesPage/></ProtectedRoute> },
+                { path: ":id", element: <ProtectedRoute pageKey="delegates"><DelegateDetailsPage/></ProtectedRoute> },
             ]
         },
 
@@ -193,31 +200,31 @@ const adminRoutes = {
 
             children: [
 
-                { index: true, element: <OrdersHomePage /> },
+                { index: true, element: <ProtectedRoute pageKey="orders"><OrdersHomePage /></ProtectedRoute> },
 
-                { path: "online", element: <OnlineScreen /> },
+                { path: "online", element: <ProtectedRoute pageKey="orders"><OnlineScreen/></ProtectedRoute> },
 
-                { path: "incoming", element: <IncomingOnlineOrdersPage /> },
+                { path: "takeaway", element: <ProtectedRoute pageKey="orders"><TakeawayScreen/></ProtectedRoute> },
 
-                { path: "takeaway", element: <TakeawayScreen /> },
+                { path: "tables", element: <ProtectedRoute pageKey="tables"><TablesScreen/></ProtectedRoute> },
 
-                { path: "tables", element: <TablesScreen /> },
+                { path: "tables/:tableNumber", element: <ProtectedRoute pageKey="tables"><TableSummaryPage/></ProtectedRoute> },
 
-                { path: "tables/:tableNumber", element: <TableSummaryPage /> },
+                { path: "tables/:tableNumber/order/:orderId/track", element: <ProtectedRoute pageKey="tables"><TableOrderTrackPage/></ProtectedRoute> },
 
-                { path: "tables/:tableNumber/order/:orderId/track", element: <TableOrderTrackPage /> },
+                { path: "sales/:type/:id", element: <ProtectedRoute pageKey="orders"><OrderSalesPage /></ProtectedRoute> },
 
-                { path: "sales/:type/:id", element: <OrderSalesPage /> },
+                { path: "busy/:type/:id", element: <ProtectedRoute pageKey="orders"><BusyCardPage /></ProtectedRoute> },
 
-                { path: "busy/:type/:id", element: <BusyCardPage /> },
+                { path: "preparation", element: <ProtectedRoute pageKey="preparation"><PreparationPage/></ProtectedRoute> },
 
-                { path: "preparation", element: <PreparationPage /> },
+                { path: "preparation/:orderId", element: <ProtectedRoute pageKey="preparation"><OrderDetailsPage/></ProtectedRoute> },
 
-                { path: "preparation/:orderId", element: <OrderDetailsPage /> },
+                { path: "history", element: <ProtectedRoute pageKey="orders"><OrderHistoryPage/></ProtectedRoute> },
+                { path: "cancellations", element: <ProtectedRoute pageKey="orders"><CancellationRequestsPage/></ProtectedRoute> },
+                { path: "table-proposals", element: <ProtectedRoute pageKey="tables"><TableProposalsPage/></ProtectedRoute> },
 
-                { path: "history", element: <OrderHistoryPage /> },
-
-                { path: "table-services", element: <TableServicesPage /> },
+                { path: "table-services", element: <ProtectedRoute pageKey="table-services"><TableServicesPage/></ProtectedRoute> },
 
             ]
 
@@ -230,9 +237,9 @@ const adminRoutes = {
 
             children: [
 
-                { index: true, element: <CustomersPage /> },
+                { index: true, element: <ProtectedRoute pageKey="customers"><CustomersPage/></ProtectedRoute> },
 
-                { path: ":id", element: <CustomerDetailsPage /> },
+                { path: ":id", element: <ProtectedRoute pageKey="customers"><CustomerDetailsPage/></ProtectedRoute> },
 
             ]
 
@@ -246,5 +253,6 @@ const adminRoutes = {
 
 
 export default adminRoutes;
+
 
 

@@ -1,14 +1,16 @@
 import apiClient from "@/services/apiClient";
 import { endpoints } from "@/services/endpoints";
+import { customerOrdersApi } from "@/modules/customer/api/customerOrders.api";
+import { customerStorage } from "@/modules/customer/services/customerStorage";
 
-export const ORDER_FULFILLMENT = { ONLINE_DELIVERY: "DELIVERY", TAKEAWAY_PICKUP: "PICKUP" };
+export const ORDER_FULFILLMENT = { ONLINE_DELIVERY: "DELIVERY", TAKEAWAY_PICKUP: "TAKEAWAY" };
 const makeIdempotencyKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 const normalizeItem = (item) => ({
-  productId: Number(item.originalId || item.productId || item.id),
-  productSizeId: Number(item.productSizeId || item.customizations?.sizeId),
+  productId: String(item.originalId || item.productId || item.id),
+  productSizeId: String(item.productSizeId || item.customizations?.sizeId),
   typeName: item.customizations?.type || item.type,
-  addonIds: (item.customizations?.addons || item.addons || []).map((addon) => Number(addon.id || addon.productAddonId || addon)),
+  addonIds: (item.customizations?.addons || item.addons || []).map((addon) => String(addon.id || addon.productAddonId || addon)),
   quantity: Number(item.quantity) || 1,
 });
 
@@ -29,18 +31,15 @@ export async function createPublicOrder(input, idempotencyKey = makeIdempotencyK
 }
 export const isPublicOrdersApiEnabled = () => true;
 export async function getPublicOrderTracking(code, token) {
-  const payload = await apiClient.get(endpoints.publicOrders.track(code), { params: { token } });
-  return payload?.data ?? payload;
+  const access = customerStorage.getOrderAccess(code);
+  return customerOrdersApi.tracking(code, token || access?.trackingReadToken);
 }
 
 // Look up an order for customer tracking by order number + phone (manual search).
 // The backend returns a SAFE projection: no ingredients/cost, no trackingToken.
 // `response` is already response.data (axios interceptor) -> { success, data }.
 export async function lookupOrderByPhone({ orderNumber, phone }) {
-  const payload = await apiClient.get(endpoints.publicOrders.lookup, {
-    params: { orderNumber: String(orderNumber || "").trim(), phone: String(phone || "").trim() },
-  });
-  return payload?.data ?? payload;
+  return customerOrdersApi.lookup({ orderNumber: String(orderNumber || "").trim(), phone: String(phone || "").trim() });
 }
 
 // List the customer's real orders from the backend by phone (safe projection).
@@ -51,3 +50,95 @@ export async function listMyOrdersByPhone(phone) {
   });
   return Array.isArray(payload?.data) ? payload.data : [];
 }
+
+// ---------------------------------------------------------------------------
+// v2 backend contract (/api/v1/public-orders). Same cart item shape in,
+// v2 tracking object out. Old functions above stay untouched.
+// ---------------------------------------------------------------------------
+const normalizeV1Item = (item) => ({
+  productId: String(item.originalId || item.productId || item.id),
+  productSizeId: String(item.productSizeId || item.customizations?.sizeId),
+  quantity: Number(item.quantity) || 1,
+  ...(item.customizations?.addons?.length || item.addons?.length
+    ? {
+        addonIds: (item.customizations?.addons || item.addons || []).map((addon) =>
+          String(addon.id || addon.productAddonId || addon)
+        ),
+      }
+    : {}),
+  ...((item.customizations?.notes || item.notes) && {
+    notes: item.customizations?.notes || item.notes,
+  }),
+});
+
+export async function createV1PublicOrder(
+  { fulfillmentType, customer, items, address },
+  idempotencyKey = makeIdempotencyKey()
+) {
+  const payload = await apiClient.post(
+    endpoints.v1.publicOrders.create,
+    {
+      fulfillmentType,
+      customer: {
+        name: String(customer.name || "").trim(),
+        phone: String(customer.phone || "").trim(),
+        ...(address ? { address: String(address) } : {}),
+      },
+      items: items.map(normalizeV1Item),
+    },
+    { headers: { "Idempotency-Key": idempotencyKey } }
+  );
+  return payload?.data ?? payload;
+}
+
+export const normalizeCustomerAddress = (customer = {}) => [customer.city, customer.area, customer.street, customer.building && `مبنى ${customer.building}`, customer.floor, customer.landmark].filter(Boolean).join("، ");
+
+const v1TrackingHeaders = (readToken) => ({
+  headers: readToken ? { "X-Tracking-Read-Token": readToken } : {},
+});
+
+const v1ActionHeaders = (actionToken, idempotencyKey) => ({
+  headers: {
+    ...(actionToken ? { "X-Order-Action-Token": actionToken } : {}),
+    ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+  },
+});
+
+export async function getV1OrderTracking(orderNumber, readToken) {
+  return customerOrdersApi.tracking(orderNumber, readToken);
+}
+
+export async function lookupV1Order({ orderNumber, phone }) {
+  return customerOrdersApi.lookup({ orderNumber: String(orderNumber || "").trim(), phone: String(phone || "").trim() });
+}
+
+export async function addV1OrderItems(orderNumber, actionToken, { items, expectedVersion }) {
+  const payload = await apiClient.post(
+    endpoints.v1.publicOrders.items(orderNumber),
+    { items: items.map(normalizeV1Item), expectedVersion },
+    v1ActionHeaders(actionToken, makeIdempotencyKey())
+  );
+  return payload?.data ?? payload;
+}
+
+export async function requestV1OrderCancellation(orderNumber, actionToken, { reason, expectedVersion }) {
+  const payload = await apiClient.post(
+    endpoints.v1.publicOrders.cancel(orderNumber),
+    { reason, expectedVersion },
+    v1ActionHeaders(actionToken, makeIdempotencyKey())
+  );
+  return payload?.data ?? payload;
+}
+
+export async function confirmV1OrderReceipt(orderNumber, actionToken, expectedVersion) {
+  const payload = await apiClient.post(
+    endpoints.v1.publicOrders.receive(orderNumber),
+    { expectedVersion },
+    v1ActionHeaders(actionToken, makeIdempotencyKey())
+  );
+  return payload?.data ?? payload;
+}
+
+export async function submitV1PublicReview(orderNumber, actionToken, body) { return customerOrdersApi.review(orderNumber, body, actionToken, makeIdempotencyKey()); }
+export async function createV1CustomerAccessSession(orderNumber, orderActionToken) { const result = await customerOrdersApi.createAccessSession({ orderNumber, orderActionToken }, makeIdempotencyKey()); customerStorage.saveAccessSession(result); return result; }
+export async function listV1CustomerHistory(page = 1) { const session = customerStorage.loadAccessSession(); if (!session?.customerAccessToken) return { items: [], pageMeta: {} }; return customerOrdersApi.history({ page, limit: 10 }, session.customerAccessToken); }

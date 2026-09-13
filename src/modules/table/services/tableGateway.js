@@ -167,10 +167,10 @@ export async function getTableSession(tableNumber, tableToken) {
 export async function createTableOrder({ tableNumber, items, tableToken }, idempotencyKey = makeIdempotencyKey()) {
   const payload = {
     items: items.map((item) => ({
-      productId: Number(item.originalId || item.productId || item.id),
-      productSizeId: Number(item.productSizeId || item.customizations?.sizeId),
+      productId: String(item.originalId || item.productId || item.id),
+      productSizeId: String(item.productSizeId || item.customizations?.sizeId),
       typeName: item.customizations?.type || item.typeName || item.type,
-      addonIds: (item.customizations?.addons || item.addons || []).map((addon) => Number(addon.id || addon.productAddonId || addon)),
+      addonIds: (item.customizations?.addons || item.addons || []).map((addon) => String(addon.id || addon.productAddonId || addon)),
       quantity: Number(item.quantity) || 1,
       notes: item.customizations?.notes || item.notes || "",
     })),
@@ -186,4 +186,84 @@ export async function getActiveTableOrder(tableNumber, tableToken) {
 
 export function isTableApiEnabled() {
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// v2 backend contract (/api/v1/table-experience). Guest token flows with the
+// X-Table-Token header. Old functions above stay untouched.
+// ---------------------------------------------------------------------------
+const v1GuestHeaders = (tableToken, idempotencyKey) => ({
+  headers: {
+    ...(tableToken ? { "X-Table-Token": tableToken } : {}),
+    ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+  },
+});
+
+export async function bootstrapV1TableGuest({ tableNumber, qrSecret }) {
+  const payload = await apiClient.post(endpoints.v1.tableGuest.bootstrap, {
+    tableNumber: Number(tableNumber),
+    qrSecret,
+  });
+  return unwrap(payload);
+}
+
+export async function submitV1TableProposal(items, tableToken) {
+  const payload = await apiClient.post(
+    endpoints.v1.tableGuest.proposals,
+    {
+      items: items.map((item) => ({
+        productId: String(item.originalId || item.productId || item.id),
+        productSizeId: String(item.productSizeId || item.customizations?.sizeId),
+        quantity: Number(item.quantity) || 1,
+      })),
+    },
+    v1GuestHeaders(tableToken, makeIdempotencyKey())
+  );
+  return unwrap(payload);
+}
+
+export async function getV1CurrentProposal(tableToken) {
+  return unwrap(
+    await apiClient.get(endpoints.v1.tableGuest.currentProposal, v1GuestHeaders(tableToken))
+  );
+}
+
+export async function cancelV1CurrentProposal(tableToken) {
+  return unwrap(
+    await apiClient.post(
+      endpoints.v1.tableGuest.cancelProposal,
+      {},
+      v1GuestHeaders(tableToken, makeIdempotencyKey())
+    )
+  );
+}
+
+export async function createV1TableService({ type, details, requestedQuantity }, tableToken) {
+  return unwrap(
+    await apiClient.post(
+      endpoints.v1.tableGuest.services,
+      { type, details, requestedQuantity },
+      v1GuestHeaders(tableToken, makeIdempotencyKey())
+    )
+  );
+}
+
+export async function cancelV1TableService(serviceId, tableToken) {
+  return unwrap(
+    await apiClient.post(
+      endpoints.v1.tableGuest.cancelService(serviceId),
+      {},
+      v1GuestHeaders(tableToken, makeIdempotencyKey())
+    )
+  );
+}
+
+export async function submitV1TableReview(orderId, tableToken, { rating, comment, expectedOrderVersion }) {
+  return unwrap(
+    await apiClient.post(
+      endpoints.v1.tableGuest.reviews(orderId),
+      { rating, comment, expectedOrderVersion },
+      v1GuestHeaders(tableToken, makeIdempotencyKey())
+    )
+  );
 }

@@ -24,7 +24,6 @@ import RateCafeModal from "../components/RateCafeModal";
 import OrderCheckoutModal from "../../checkout/components/OrderCheckoutModal";
 import OrderSuccessModal from "../../checkout/components/OrderSuccessModal";
 import { useCreatePublicOrder } from "../../checkout/hooks/useCreatePublicOrder";
-import { setLastOrder, saveCustomerProfile } from "../../checkout/services/checkoutCustomerService";
 
 import { MAIN_PAGE_DATA } from "../data/mainPageData";
 import { getTopProducts, getPublicMenu } from "@/services/catalogService";
@@ -327,10 +326,6 @@ export default function CustomerMainPage() {
           onClose={() => setIsCheckoutOpen(false)}
           onSubmit={async (checkoutData) => {
             const order = await createOrder.mutateAsync(checkoutData);
-            setLastOrder({ orderNumber: String(order?.orderNumber || order?.publicCode || order?.id || ""), trackingToken: order?.trackingToken || "" });
-            if (checkoutData?.customer?.phone) {
-              saveCustomerProfile({ name: checkoutData.customer.name || "", phone: checkoutData.customer.phone || "" });
-            }
             setIsCheckoutOpen(false);
             setCompletedOrder(order);
             setCartItems([]);

@@ -1,11 +1,11 @@
-import { ConciergeBell, Droplets, ReceiptText, SprayCan, UtensilsCrossed } from "lucide-react";
+import { ConciergeBell, Droplets, ReceiptText, PartyPopper, TriangleAlert } from "lucide-react";
 
 const services = [
-  { type: "WAITER", title: "استدعاء الجرسون", text: "اطلب حضور الجرسون للطاولة", icon: ConciergeBell },
-  { type: "BILL", title: "طلب الحساب", text: "اطلب تجهيز فاتورة الطاولة", icon: ReceiptText },
-  { type: "UTENSILS", title: "أدوات إضافية", text: "مناديل أو أدوات للمائدة", icon: UtensilsCrossed },
-  { type: "WATER", title: "مياه", text: "اطلب مياه للطاولة", icon: Droplets },
-  { type: "CLEANING", title: "تنظيف الطاولة", text: "اطلب تنظيفًا سريعًا", icon: SprayCan },
+  { type: "CALL_WAITER", title: "مناداة جرسون", text: "اطلب حضور الجرسون للطاولة", icon: ConciergeBell },
+  { type: "WATER_REQUEST", title: "طلب مياه", text: "اطلب مياه للطاولة", icon: Droplets },
+  { type: "PARTY_SURPRISE", title: "تجهيز مفاجأة حفلة", text: "اطلب تجهيز مفاجأة للطاولة", icon: PartyPopper },
+  { type: "BILL_REQUEST", title: "طلب الحساب", text: "اطلب تجهيز فاتورة الطاولة", icon: ReceiptText },
+  { type: "REPORT_PROBLEM", title: "ظهور مشكلة", text: "أبلغ الجرسون عن مشكلة", icon: TriangleAlert },
 ];
 
 export default function TableWaiterServicesGrid({ pendingType, onRequest }) {

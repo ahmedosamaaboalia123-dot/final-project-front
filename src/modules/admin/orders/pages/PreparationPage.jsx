@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "@/shared/components/PageHeader/PageHeader";
-import { usePrepOrders } from "../hooks/usePrepOrders";
+import { usePreparation } from "../hooks/order.queries";
+import ServerPagination from "@/shared/components/ServerPagination/ServerPagination";
 import "../styles/PreparationPage.css";
 
 const STATUS_LABELS = {
@@ -20,15 +21,10 @@ const tabs = [
 export default function PreparationPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("current");
-  const { data: orders = [], isLoading, error } = usePrepOrders();
-
-  const shown = useMemo(() => {
-    const tab = tabs.find((t) => t.key === activeTab);
-    return orders.filter((o) => tab.statuses.includes(o.status));
-  }, [orders, activeTab]);
-
-  const tables = shown.filter((x) => x.fulfillmentType === "DINE_IN");
-  const online = shown.filter((x) => x.fulfillmentType !== "DINE_IN");
+  const [group, setGroup] = useState("online");
+  const [page, setPage] = useState(1);
+  const { data, isLoading, error } = usePreparation({ group, tab: activeTab, page, limit: 10 });
+  const shown = data?.items || [];
 
   const openOrder = (order) => navigate(`/admin/orders/preparation/${order.id}`);
 
@@ -64,7 +60,7 @@ export default function PreparationPage() {
                   </button>
                   {activeTab === "ready" && (
                     <button className="btn-deliver" onClick={() => navigate(`/admin/orders/busy/online/${order.id}`)}>
-                      {order.fulfillmentType === "DELIVERY" ? "اختيار المندوب" : order.fulfillmentType === "PICKUP" ? "تسليم للعميل" : "فتح"}
+                      {order.fulfillmentType === "DELIVERY" ? "اختيار المندوب" : order.fulfillmentType === "TAKEAWAY" ? "تسليم للعميل" : "فتح"}
                     </button>
                   )}
                 </td>
@@ -96,17 +92,10 @@ export default function PreparationPage() {
       {isLoading ? (
         <p className="prep-loading">جاري تحميل الطلبات...</p>
       ) : (
-        <div className="prep-cols">
-          <div className="prep-col">
-            <h4 className="prep-col-title">طلبات الطاولات</h4>
-            {renderTable(tables, "لا توجد طلبات")}
-          </div>
-          <div className="prep-col">
-            <h4 className="prep-col-title">الأونلاين والتيك أواي</h4>
-            {renderTable(online, "لا توجد طلبات")}
-          </div>
-        </div>
+        <div className="prep-cols"><div className="prep-col"><h4 className="prep-col-title">{group === "tables" ? "طلبات الطاولات" : "الأونلاين والتيك أواي"}</h4>{renderTable(shown, "لا توجد طلبات")}</div></div>
       )}
+      <div className="prep-tabs"><button className={group === "online" ? "prep-tab active" : "prep-tab"} onClick={() => { setGroup("online"); setPage(1); }}>أونلاين وتيك أواي</button><button className={group === "tables" ? "prep-tab active" : "prep-tab"} onClick={() => { setGroup("tables"); setPage(1); }}>الطاولات</button></div>
+      <ServerPagination meta={data?.meta} onPageChange={setPage} disabled={isLoading} label="طلب" />
     </div>
   );
 }

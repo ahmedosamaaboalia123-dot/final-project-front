@@ -1,23 +1,15 @@
 import { useNavigate } from "react-router-dom";
 import PageHeader from "@/shared/components/PageHeader/PageHeader";
-import { useTableSummaries } from "../hooks/useTableSummaries";
+import { useTablesBoard } from "../hooks/order.queries";
 import "../styles/TablesScreen.css";
-
-const TABLE_COUNT = 20;
 
 export default function TablesScreen() {
   const navigate = useNavigate();
-  const { data: summaries = [], isLoading, error } = useTableSummaries();
-
-  const byTable = new Map((summaries || []).map((s) => [Number(s.table), s]));
-
-  const tables = Array.from({ length: TABLE_COUNT }, (_, i) => {
-    const tableNum = i + 1;
-    return { id: tableNum, summary: byTable.get(tableNum) };
-  });
+  const { data, isLoading, error } = useTablesBoard();
+  const tables = data?.tables || [];
 
   const openTable = (table) => {
-    if (table.summary) {
+    if (table.occupancy === "OCCUPIED") {
       navigate(`/admin/orders/tables/${table.id}`);
     } else {
       navigate(`/admin/orders/sales/table/${table.id}`);
@@ -34,21 +26,23 @@ export default function TablesScreen() {
       ) : (
         <div className="tables-grid">
           {tables.map((table) => {
-            const isBusy = Boolean(table.summary);
+            const isBusy = table.occupancy === "OCCUPIED";
+            const disabled = table.occupancy === "OUT_OF_SERVICE";
             return (
               <button
                 key={table.id}
                 className={`table-card ${isBusy ? "table-card--busy" : ""}`}
                 onClick={() => openTable(table)}
                 type="button"
+                disabled={disabled}
               >
-                <span className="table-card__number">{table.id}</span>
+                <span className="table-card__number">{table.tableNumber}</span>
                 <span className="table-card__label">
-                  {isBusy ? "مشغول" : "فارغة"}
+                  {disabled ? "خارج الخدمة" : isBusy ? "مشغول" : "فارغة"}
                 </span>
-                {isBusy && table.summary.orderCount > 1 && (
+                {isBusy && (
                   <span className="table-card__orders">
-                    {table.summary.orderCount} طلب
+                    {table.order?.progress?.ready || 0}/{table.order?.progress?.total || 0} جاهز
                   </span>
                 )}
               </button>

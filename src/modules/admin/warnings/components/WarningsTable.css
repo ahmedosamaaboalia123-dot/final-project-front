@@ -284,3 +284,4 @@
   color: #B4A79C;
   padding: 0 4px;
 }
+.severity-badge{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:800}.severity-badge.high{background:#fdecec;color:#b33b3b}.severity-badge.medium{background:#fdf3e3;color:#b7791f}.severity-badge.low{background:#eaf7ee;color:#267341}.no-warnings-state{padding:38px 16px;text-align:center;color:#7d6c60;display:flex;flex-direction:column;align-items:center;gap:10px}.no-warnings-icon{color:#2d8a4e}

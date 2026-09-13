@@ -11,7 +11,6 @@ import SearchBar from "../../../customer/main-page/components/SearchBar";
 import CategoryCards from "../../../customer/main-page/components/CategoryCards";
 import BestSellersSection from "../../../customer/main-page/components/BestSellersSection";
 import TableReviewsSection from "../components/TableReviewsSection";
-import WeeklyOfferBanner from "../../../customer/main-page/components/WeeklyOfferBanner";
 import BranchInfoCard from "../../../customer/main-page/components/BranchInfoCard";
 import CustomerFooter from "../../../customer/main-page/components/CustomerFooter";
 import CustomerBottomNav from "../../../customer/main-page/components/CustomerBottomNav";
@@ -51,6 +50,8 @@ export default function TableMainPage() {
     setIsCartOpen,
     toastMessage,
     triggerRequestBill,
+    accessError,
+    hasTableAccess,
   } = useTable();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -109,24 +110,16 @@ export default function TableMainPage() {
     setTimeout(() => setRecentlyAddedId(null), 1800);
   };
 
-  const handleApplyOffer = (code) => {
-    showToast(`تم تطبيق كود خصم الطاولات: ${code} بنجاح 🎉`);
-  };
-
   const handleNavDrawerAction = (action) => {
     setIsNavDrawerOpen(false);
     if (action === "menu") {
       navigate(`/table/${tableNumber}/menu`);
     } else if (action === "orders" || action === "track") {
       navigate(`/table/${tableNumber}/orders`);
-    } else if (action === "chatbot") {
-      navigate(`/table/${tableNumber}/chatbot`);
     } else if (action === "waiter") {
       setIsWaiterModalOpen(true);
     } else if (action === "table_switch") {
       setIsTableSelectorOpen(true);
-    } else if (action === "offers") {
-      document.getElementById("offers-anchor")?.scrollIntoView({ behavior: "smooth" });
     } else if (action === "games") {
       navigate(`/table/${tableNumber}/feedback`);
     } else if (action === "rate") {
@@ -150,6 +143,8 @@ export default function TableMainPage() {
   };
 
   const activeToast = toastMessage || localToast;
+
+  if (!hasTableAccess) return <main className="customer-app-wrapper" dir="rtl" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}><section className="customer-mobile-viewport" style={{ padding: 24, textAlign: "center" }}><h1>الدخول إلى الطاولة</h1><p role={accessError ? "alert" : undefined}>{accessError || "جاري التحقق من رمز QR..."}</p></section></main>;
 
   return (
     <div className="customer-app-wrapper" dir="rtl">
@@ -186,7 +181,6 @@ export default function TableMainPage() {
             onOrderNow={() => {
               navigate(`/table/${tableNumber}/menu`);
             }}
-            onOpenOffers={() => document.getElementById("offers-anchor")?.scrollIntoView({ behavior: "smooth" })}
             onOpenOrders={() => navigate(`/table/${tableNumber}/orders`)}
             onOpenWaiter={() => navigate(`/table/${tableNumber}/services`)}
           />
@@ -218,12 +212,6 @@ export default function TableMainPage() {
           />
 
           <TableReviewsSection onMore={() => navigate(`/table/${tableNumber}/feedback`)} onAdd={() => setIsRateCafeOpen(true)} />
-
-          {/* 7. Weekly Offer Banner (عرض الأسبوع لضيوف الطاولات) */}
-          <WeeklyOfferBanner
-            offerData={MAIN_PAGE_DATA.weeklyOffer}
-            onApplyOffer={handleApplyOffer}
-          />
 
           {/* 9. Branch Info & Table Amenities Card */}
           <BranchInfoCard

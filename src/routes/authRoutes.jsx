@@ -1,6 +1,8 @@
-import { Navigate } from 'react-router-dom';
+import { lazy } from 'react';
+
+const LoginPage = lazy(() => import('@/modules/auth/login/LoginPage'));
 
 export const authRoutes = {
   path: '/login',
-  element: <Navigate to="/admin/dashboard" replace />,
+  element: <LoginPage />,
 };

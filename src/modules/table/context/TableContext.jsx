@@ -6,7 +6,8 @@ import {
   getActiveOrderByTableNumber,
   getOrdersByTableNumber,
 } from "../services/tableOrdersService";
-import { createTableOrder, getActiveTableOrder, requestTableService } from "../services/tableGateway";
+import { bootstrapV1TableGuest, cancelV1CurrentProposal, createV1TableService, getV1CurrentProposal, submitV1TableProposal } from "../services/tableGateway";
+import { tableSessionStorage } from "../services/tableSessionStorage";
 import { createTrackingSocket } from "@/services/realtime";
 
 const TableContext = createContext(null);
@@ -14,15 +15,20 @@ const TableContext = createContext(null);
 export function TableProvider({ children }) {
   const params = useParams();
   const navigate = useNavigate();
-  const tableToken = new URLSearchParams(window.location.search).get("token") || sessionStorage.getItem(`404_table_token_${params.tableId || 4}`) || "";
+  const qrSecret = new URLSearchParams(window.location.search).get("qrSecret") || "";
 
   // Active table number (from param or saved)
   const [tableNumber, setTableNumberState] = useState(() => {
     if (params.tableId && !isNaN(parseInt(params.tableId, 10))) {
       return parseInt(params.tableId, 10);
     }
-    return getCurrentTableNumber();
+    return null;
   });
+
+  const [guestAccess, setGuestAccess] = useState(() => params.tableId ? tableSessionStorage.read(params.tableId) : null);
+  const tableToken = guestAccess?.tableToken || "";
+  const [currentProposal, setCurrentProposal] = useState(null);
+  const [accessError, setAccessError] = useState("");
 
   const [activeOrder, setActiveOrder] = useState(null);
   const [tableOrders, setTableOrders] = useState([]);
@@ -52,6 +58,8 @@ export function TableProvider({ children }) {
     }
   }, [params.tableId]);
 
+  useEffect(() => { if (!params.tableId) return; const stored = tableSessionStorage.read(params.tableId); if (stored) { setGuestAccess(stored); return; } if (!qrSecret) { setAccessError("رابط الطاولة غير صالح أو انتهت جلسته. امسح رمز QR مرة أخرى."); return; } bootstrapV1TableGuest({ tableNumber: Number(params.tableId), qrSecret }).then((value) => { tableSessionStorage.save(params.tableId, value); setGuestAccess(value); setAccessError(""); const clean = `${window.location.pathname}`; window.history.replaceState({}, "", clean); }).catch((e) => setAccessError(e?.response?.data?.error?.messageAr || e.message)); }, [params.tableId, qrSecret]);
+
   // Load orders for current table
   const refreshTableData = useCallback(async () => {
     if (refreshInFlight.current) return refreshInFlight.current;
@@ -60,15 +68,7 @@ export function TableProvider({ children }) {
     setTableOrders(orders);
     const localActive = getActiveOrderByTableNumber(tableNumber);
     setActiveOrder(localActive);
-    try {
-      const remoteActive = await getActiveTableOrder(tableNumber, tableToken);
-      if (remoteActive) {
-        setActiveOrder(remoteActive);
-        setTableOrders((current) => [remoteActive, ...current.filter((order) => order.id !== remoteActive.id)]);
-      }
-    } catch {
-      // Keep the local/demo order until the table API becomes available.
-    }
+    if (tableToken) try { const result = await getV1CurrentProposal(tableToken); setCurrentProposal(result?.proposal || null); } catch { setCurrentProposal(null); }
     })();
     refreshInFlight.current = task;
     try {
@@ -76,10 +76,6 @@ export function TableProvider({ children }) {
     } finally {
       refreshInFlight.current = null;
     }
-  }, [tableNumber, tableToken]);
-
-  useEffect(() => {
-    if (tableToken) sessionStorage.setItem(`404_table_token_${tableNumber}`, tableToken);
   }, [tableNumber, tableToken]);
 
   useEffect(() => {
@@ -103,9 +99,9 @@ export function TableProvider({ children }) {
     const socket = createTrackingSocket(trackingToken);
     const handleOrderUpdate = (payload) => {
       const updated = payload?.order;
-      if (!updated || Number(updated.id) !== Number(activeOrder.id)) return;
+      if (!updated || String(updated.id) !== String(activeOrder.id)) return;
       setActiveOrder(updated);
-      setTableOrders((current) => [updated, ...current.filter((order) => Number(order.id) !== Number(updated.id))]);
+      setTableOrders((current) => [updated, ...current.filter((order) => String(order.id) !== String(updated.id))]);
     };
     socket.on("order:updated", handleOrderUpdate);
     return () => {
@@ -151,14 +147,14 @@ export function TableProvider({ children }) {
 
   // Waiter Call
   const triggerCallWaiter = async (reason = "طلب حضور الويتر") => {
-    await requestTableService({ tableNumber, tableToken, type: "WAITER", reason });
+    await createV1TableService({ type: "CALL_WAITER", details: reason }, tableToken);
     showToast(`تم إرسال تنبيه للجرسون للحضور إلى طاولة رقم ${tableNumber} (${reason})`);
     setIsWaiterModalOpen(false);
   };
 
   // Bill Request
   const triggerRequestBill = async (method = "كاش") => {
-    await requestTableService({ tableNumber, tableToken, type: "BILL", reason: method });
+    await createV1TableService({ type: "BILL_REQUEST", details: method }, tableToken);
     showToast(`🧾 تم إرسال طلب الحساب والفاتورة (${method}) لكاشير طاولة رقم ${tableNumber}`);
   };
 
@@ -215,12 +211,14 @@ export function TableProvider({ children }) {
 
   const submitTableOrder = async () => {
     if (!tableCart.length) return null;
-    const created = await createTableOrder({ tableNumber, tableToken, items: tableCart });
+    const created = await submitV1TableProposal(tableCart, tableToken);
     setTableCart([]);
+    setCurrentProposal(created?.proposal || null);
     await refreshTableData();
     showToast(`تم إرسال طلب طاولة رقم ${tableNumber} بنجاح`);
     return created;
   };
+  const cancelCurrentProposal = async () => { const result = await cancelV1CurrentProposal(tableToken); setCurrentProposal(result?.proposal || null); return result; };
 
   const value = {
     tableNumber,
@@ -245,6 +243,11 @@ export function TableProvider({ children }) {
     removeFromCart,
     totalCartItemsCount,
     submitTableOrder,
+    currentProposal,
+    cancelCurrentProposal,
+    tableToken,
+    accessError,
+    hasTableAccess: Boolean(tableToken),
   };
 
   return <TableContext.Provider value={value}>{children}</TableContext.Provider>;

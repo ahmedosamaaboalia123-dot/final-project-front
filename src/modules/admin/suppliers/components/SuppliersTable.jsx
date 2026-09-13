@@ -1,16 +1,38 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft,ChevronRight,Eye,RefreshCw,Search,Trash2,Users } from "lucide-react";
-import { useDeleteSupplier, useSuppliers } from "../hooks/useSuppliers";
+import { Eye, Pencil, RefreshCw, Search, Trash2, Users } from "lucide-react";
+import { useAuthStore } from "@/store/authStore";
+import { can } from "@/modules/auth/permissions/permission";
+import { useDebounce } from "@/shared/hooks/useDebounce";
+import { AsyncState, ConfirmAction, Money, ServerPagination } from "@/shared/components";
+import { useRealtimeRoom } from "@/realtime/useRealtimeRoom";
+import { useSuppliersScreen } from "../hooks/supplier.queries";
+import { useDeleteSupplier } from "../hooks/supplier.mutations";
 import "./SuppliersTable.css";
-function SuppliersTable(){
- const navigate=useNavigate();const [search,setSearch]=useState(""),[page,setPage]=useState(1),[pageSize,setPageSize]=useState(10);
- const query=useSuppliers({page,pageSize,search});
- const remove=useDeleteSupplier();
- const rows=query.data?.data||[],pagination=query.data?.pagination||{total:0,totalPages:1};
- return <div className="suppliers-table-card"><div className="table-card-header"><div className="table-card-title"><div className="title-users-badge"><Users size={18}/></div><span>قائمة الموردين</span></div><div className="table-header-actions"><div className="search-input-wrapper"><input className="table-search-input" placeholder="ابحث بالاسم أو الهاتف أو المدينة" value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}}/><Search size={17} className="table-search-icon"/></div><button className="refresh-btn" onClick={()=>query.refetch()}><RefreshCw size={16}/>تحديث</button></div></div>
- {query.isError&&<div className="data-state data-state--error">تعذر تحميل الموردين.</div>}{remove.isError&&<div className="data-state data-state--error">{remove.error?.response?.data?.message||"تعذر حذف المورد"}</div>}
- <div className="table-responsive-container"><table className="custom-suppliers-table"><colgroup><col className="col-index"/><col/><col/><col className="col-phone"/><col/><col/><col className="col-actions"/></colgroup><thead><tr><th>م</th><th>اسم المورد</th><th>اسم المسؤول</th><th>رقم الهاتف</th><th>نوع المورد</th><th>المدينة</th><th className="actions-heading">الإجراءات</th></tr></thead><tbody>{query.isLoading?<tr><td colSpan="7">جاري التحميل...</td></tr>:rows.length===0?<tr><td colSpan="7">لا يوجد موردون.</td></tr>:rows.map((row,index)=><tr key={row.id}><td>{(page-1)*pageSize+index+1}</td><td className="supplier-name-cell">{row.name}</td><td>{row.contactPerson}</td><td dir="ltr">{row.phone}</td><td>{row.supplierType}</td><td>{row.city}</td><td className="actions-cell"><div className="row-actions-group"><button type="button" className="action-icon-btn btn-view" title="عرض تفاصيل المورد" aria-label={`عرض تفاصيل ${row.name}`} onClick={()=>navigate(`/admin/suppliers/${row.id}`)}><Eye size={17}/></button><button type="button" className="action-icon-btn btn-delete" title="حذف المورد" aria-label={`حذف ${row.name}`} onClick={()=>window.confirm(`حذف المورد «${row.name}»؟`)&&remove.mutate(row.id)}><Trash2 size={17}/></button></div></td></tr>)}</tbody></table></div>
- <div className="table-pagination-bar"><div className="pagination-info"><span>إجمالي {pagination.total}</span><select value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(1)}}><option>10</option><option>25</option><option>50</option></select></div><div className="pagination-nav-group"><button disabled={page<=1} onClick={()=>setPage(p=>p-1)}><ChevronRight/></button><b>{page}</b><button disabled={page>=pagination.totalPages} onClick={()=>setPage(p=>p+1)}><ChevronLeft/></button></div></div></div>
+
+function SupplierRow({ row, index, canUpdate, canDelete, onOpen, onDeleted }) {
+  const remove = useDeleteSupplier(row.id, { onSuccess: onDeleted });
+  return <tr><td>{index}</td><td className="supplier-name-cell">{row.name}</td><td>{row.contactPerson}</td><td dir="ltr">{row.phone}</td><td>{row.city}</td><td><Money value={row.debtBalance}/></td><td><Money value={row.receivableBalance}/></td><td className="actions-cell"><div className="row-actions-group">
+    <button type="button" className="action-icon-btn btn-view" aria-label={`عرض تفاصيل ${row.name}`} onClick={onOpen}><Eye size={17}/></button>
+    {canUpdate && <button type="button" className="action-icon-btn btn-edit" aria-label={`تعديل ${row.name}`} onClick={onOpen}><Pencil size={17}/></button>}
+    {canDelete && <ConfirmAction danger requireReason pending={remove.isPending} title="حذف المورد" message={`لن يُحذف «${row.name}» إذا كان مرتبطًا بمواد أو فواتير أو قيود مالية.`} confirmLabel="حذف" onConfirm={(reason) => remove.mutateAsync({ reason, expectedVersion: row.version })}><Trash2 size={17}/></ConfirmAction>}
+  </div>{remove.isError && <small className="row-error" role="alert">{remove.error.message}</small>}</td></tr>;
 }
-export default SuppliersTable;
+
+export default function SuppliersTable() {
+  const navigate = useNavigate(); const permissions = useAuthStore((state) => state.permissions);
+  const [search, setSearch] = useState(""); const [page, setPage] = useState(1);
+  const debouncedSearch = useDebounce(search, 500);
+  const query = useSuppliersScreen({ page, limit: 10, search: debouncedSearch || undefined });
+  const data = query.data; const rows = data?.suppliers || [];
+  useRealtimeRoom({ scope: "suppliers:list", rooms: rows.map((row) => `aggregate:Supplier:${row.id}`), enabled: rows.length > 0 });
+  const deleted = async () => { if (rows.length === 1 && page > 1) setPage((value) => value - 1); else await query.refetch(); };
+  return <div className="suppliers-table-card">
+    <div className="supplier-screen-summary"><article><span>إجمالي الموردين</span><strong>{data?.summary.totalSuppliers ?? 0}</strong></article><article><span>إجمالي الديون</span><Money value={data?.summary.totalDebt}/></article><article><span>إجمالي المستحقات</span><Money value={data?.summary.totalReceivable}/></article></div>
+    <div className="table-card-header"><div className="table-card-title"><div className="title-users-badge"><Users size={18}/></div><span>قائمة الموردين</span></div><div className="table-header-actions"><div className="search-input-wrapper"><input className="table-search-input" placeholder="ابحث بالاسم أو المسؤول أو الهاتف" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }}/><Search size={17} className="table-search-icon"/></div><button className="refresh-btn" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw size={16}/>تحديث</button></div></div>
+    <AsyncState loading={query.isLoading} error={query.error} onRetry={query.refetch} empty={!query.isLoading && rows.length === 0} emptyText="لا يوجد موردون يطابقون البحث">
+      <div className="table-responsive-container"><table className="custom-suppliers-table"><thead><tr><th>م</th><th>اسم المورد</th><th>المسؤول</th><th>الهاتف</th><th>المدينة</th><th>الديون</th><th>المستحقات</th><th>الإجراءات</th></tr></thead><tbody>{rows.map((row, index) => <SupplierRow key={row.id} row={row} index={(page - 1) * 10 + index + 1} canUpdate={can(permissions, "suppliers.update")} canDelete={can(permissions, "suppliers.update")} onOpen={() => navigate(`/admin/suppliers/${row.id}`)} onDeleted={deleted}/>)}</tbody></table></div>
+    </AsyncState>
+    <ServerPagination meta={data?.pageMeta} onPageChange={setPage} disabled={query.isFetching} label="مورد"/>
+  </div>;
+}

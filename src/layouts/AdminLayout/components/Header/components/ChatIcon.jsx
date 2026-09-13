@@ -7,10 +7,8 @@ import {
 function ChatIcon({notifications}){
 
 
-    const count =
-    notifications?.filter(
-    item=>!item.is_read
-    ).length;
+    const items = Array.isArray(notifications?.items) ? notifications.items : [];
+    const count = items.filter((item) => (item.type === "CHAT" || item.category === "CHAT") && !item.isRead && !item.is_read).length;
 
 
 

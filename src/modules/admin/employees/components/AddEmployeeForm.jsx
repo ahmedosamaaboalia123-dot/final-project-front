@@ -1,28 +1,141 @@
-import { useState } from "react";
-import { Plus, Save } from "lucide-react";
-import { useCreateEmployee } from "../hooks/useEmployees";
+import { useEffect, useMemo, useState } from "react";
+import { Save } from "lucide-react";
+import Input from "@/shared/components/Input/Input";
+import Select from "@/shared/components/Select/Select";
+import Button from "@/shared/components/Button/Button";
+import { useAuthStore } from "@/store/authStore";
+import { can } from "@/modules/auth/permissions/permission";
+import { useCreateEmployee } from "../hooks/employee.mutations";
+import { toRoleOptions } from "../adapters/employee.adapter";
+import { createEmployeeSchema, firstEmployeeFormError } from "../schemas/employee.schema";
 
-const emptyForm = { name: "", password: "", position: "", workStart: "08:00", workEnd: "16:00" };
+const emptyForm = {
+  name: "",
+  passwordPlainText: "",
+  position: "",
+  roleId: "",
+  status: "ACTIVE",
+  workStart: "08:00",
+  workEnd: "16:00",
+  crossesMidnight: false,
+  graceMinutes: "0",
+};
 
-export default function AddEmployeeForm() {
+export default function AddEmployeeForm({ roles = [] }) {
+  const permissions = useAuthStore((state) => state.permissions);
   const [form, setForm] = useState(emptyForm);
-  const create = useCreateEmployee();
-  const change = (name) => (event) => setForm((current) => ({ ...current, [name]: event.target.value }));
+  const [validationError, setValidationError] = useState("");
+  const mutation = useCreateEmployee({
+    onSuccess: () => {
+      setForm(emptyForm);
+      setValidationError("");
+    },
+  });
+  const roleOptions = useMemo(
+    () => toRoleOptions(Array.isArray(roles) ? roles : []).filter((role) => /^[0-9a-f]{24}$/i.test(role.value)),
+    [roles]
+  );
 
-  return <form className="employee-form-card" onSubmit={(event) => {
+  useEffect(() => {
+    if (!form.roleId && roleOptions.length) {
+      setForm((current) => ({ ...current, roleId: roleOptions[0].value }));
+    }
+  }, [form.roleId, roleOptions]);
+
+  if (!can(permissions, "employees.create")) return null;
+
+  const set = (name, value) => {
+    mutation.resetAttempt();
+    setValidationError("");
+    setForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const submit = (event) => {
     event.preventDefault();
-    create.mutate({ ...form, role: "CASHIER" }, { onSuccess: () => setForm(emptyForm) });
-  }}>
-    <div className="employee-card-title"><Plus size={17}/><h2>إضافة موظف</h2></div>
-    <div className="employee-form-grid">
-      <label><span>اسم الموظف</span><input required value={form.name} onChange={change("name")}/></label>
-      <label><span>كلمة المرور</span><input required minLength={6} type="text" autoComplete="new-password" value={form.password} onChange={change("password")}/></label>
-      <label><span>اسم المنصب</span><input required value={form.position} onChange={change("position")}/></label>
-      <label><span>بداية العمل</span><input required type="time" value={form.workStart} onChange={change("workStart")}/></label>
-      <label><span>نهاية العمل</span><input required type="time" value={form.workEnd} onChange={change("workEnd")}/></label>
-    </div>
-    {create.isError && <p className="employee-alert error" role="alert">{create.error?.response?.data?.message || create.error.message}</p>}
-    {create.isSuccess && <p className="employee-alert success">تم حفظ الموظف بنجاح</p>}
-    <button className="employee-primary" disabled={create.isPending}><Save size={16}/>{create.isPending ? "جاري الحفظ..." : "حفظ الموظف"}</button>
-  </form>;
+    const parsed = createEmployeeSchema.safeParse({
+      name: form.name,
+      passwordPlainText: form.passwordPlainText,
+      position: form.position,
+      roleId: form.roleId,
+      status: form.status,
+      workStart: form.workStart,
+      workEnd: form.workEnd,
+      crossesMidnight: Boolean(form.crossesMidnight),
+      timezone: "Africa/Cairo",
+      graceMinutes: Number(form.graceMinutes),
+    });
+    if (!parsed.success) {
+      setValidationError(firstEmployeeFormError(parsed));
+      return;
+    }
+    mutation.mutate(parsed.data);
+  };
+
+  return (
+    <section className="employee-form-card" aria-label="إضافة موظف">
+      <div className="employee-card-title">
+        <h2>إضافة موظف</h2>
+      </div>
+      <form onSubmit={submit}>
+        <div className="employee-form-grid">
+          <Input label="اسم الموظف" name="name" required value={form.name} onChange={(event) => set("name", event.target.value)} />
+          <Input
+            label="كلمة المرور"
+            name="passwordPlainText"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={form.passwordPlainText}
+            onChange={(event) => set("passwordPlainText", event.target.value)}
+          />
+          <Input label="المسمى الوظيفي" name="position" required value={form.position} onChange={(event) => set("position", event.target.value)} />
+          <Select
+            label="الدور"
+            name="roleId"
+            required
+            value={form.roleId}
+            onChange={(event) => set("roleId", event.target.value)}
+            options={roleOptions}
+            placeholder={roleOptions.length ? "اختر الدور" : "لا توجد أدوار متاحة"}
+          />
+          <Select
+            label="الحالة"
+            name="status"
+            value={form.status}
+            onChange={(event) => set("status", event.target.value)}
+            options={[
+              { value: "ACTIVE", label: "نشط" },
+              { value: "INACTIVE", label: "موقوف" },
+            ]}
+          />
+          <Input label="بداية العمل (HH:MM)" name="workStart" type="time" required value={form.workStart} onChange={(event) => set("workStart", event.target.value)} />
+          <Input label="نهاية العمل (HH:MM)" name="workEnd" type="time" required value={form.workEnd} onChange={(event) => set("workEnd", event.target.value)} />
+          <Input
+            label="مهلة التأخير (دقيقة)"
+            name="graceMinutes"
+            type="number"
+            min="0"
+            max="180"
+            value={form.graceMinutes}
+            onChange={(event) => set("graceMinutes", event.target.value)}
+          />
+        </div>
+        <label className="employee-check">
+          <input type="checkbox" checked={form.crossesMidnight} onChange={(event) => set("crossesMidnight", event.target.checked)} />
+          <span>الوردية تتجاوز منتصف الليل</span>
+        </label>
+        <p className="employee-hint">المنطقة الزمنية ثابتة: Africa/Cairo</p>
+        {(validationError || mutation.isError) && (
+          <p className="employee-alert error" role="alert">
+            {validationError || mutation.error?.message || "تعذر حفظ الموظف"}
+          </p>
+        )}
+        {mutation.isSuccess && <p className="employee-alert success">تم حفظ الموظف بنجاح</p>}
+        {!roleOptions.length && <p className="employee-alert error" role="alert">يجب إنشاء دور واحد على الأقل قبل إضافة موظف.</p>}
+        <Button type="submit" loading={mutation.isPending} disabled={!roleOptions.length} icon={Save}>
+          حفظ الموظف
+        </Button>
+      </form>
+    </section>
+  );
 }

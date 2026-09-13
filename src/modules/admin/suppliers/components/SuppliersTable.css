@@ -7,6 +7,7 @@
   box-shadow: 0 4px 20px rgba(60, 40, 20, 0.05);
   border: 1px solid #EDE3DA;
 }
+.supplier-screen-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}.supplier-screen-summary article{display:flex;flex-direction:column;gap:4px;padding:13px;border:1px solid var(--border-main);border-radius:12px;background:var(--surface-soft)}.supplier-screen-summary span{font-size:12px;color:var(--text-secondary)}.supplier-screen-summary strong,.supplier-screen-summary article>span+span{font-size:17px;color:var(--primary);font-weight:800}.supplier-status-filter{min-height:44px;padding:0 12px;border:1px solid var(--border-main);border-radius:10px;background:#fff;font:inherit}.supplier-status{display:inline-flex;padding:4px 9px;border-radius:99px;font-weight:700}.supplier-status--active{background:var(--success-bg);color:var(--success)}.supplier-status--inactive{background:var(--danger-bg);color:var(--danger)}.row-error{display:block;max-width:170px;white-space:normal;color:var(--danger);margin-top:4px}
 
 /* Card Header */
 .table-card-header {
@@ -353,6 +354,7 @@
 
 /* Mobile: comfortable touch targets for action buttons */
 @media (max-width: 768px) {
+  .supplier-screen-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
   .action-icon-btn {
     width: 44px;
     height: 44px;
@@ -384,3 +386,4 @@
     border-radius: 0;
   }
 }
+@media(max-width:480px){.supplier-screen-summary{grid-template-columns:1fr}}

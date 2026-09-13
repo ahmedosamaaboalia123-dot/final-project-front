@@ -1,0 +1,11 @@
+.fr-refund-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.fr-refund-card{background:#fff;border:1px solid #eadfd3;border-radius:12px;padding:14px;margin-top:12px}
+.fr-refund-card h3{margin:0 0 6px;font-size:15px;color:#4a2f1c}
+.fr-refund-hint{margin:0 0 10px;font-size:12px;color:#79695d;line-height:1.8}
+.fr-refund-form{display:grid;grid-template-columns:1fr 220px auto;gap:10px;align-items:end}
+.fr-sweep-result{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 0}
+.fr-sweep-result div{background:#f8f3ed;border:1px solid #eadfd3;border-radius:10px;padding:10px;text-align:center}
+.fr-sweep-result dt{font-size:12px;color:#79695d}
+.fr-sweep-result dd{margin:4px 0 0;font-size:18px;font-weight:700;color:#35271f}
+@media(max-width:860px){.fr-refund-grid{grid-template-columns:1fr}.fr-refund-form{grid-template-columns:1fr 1fr}.fr-refund-form button{grid-column:1/-1;min-height:44px}}
+@media(max-width:520px){.fr-refund-form{grid-template-columns:1fr}.fr-sweep-result{grid-template-columns:1fr}}

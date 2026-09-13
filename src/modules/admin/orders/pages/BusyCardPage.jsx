@@ -1,211 +1,172 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowRight, CheckCircle2, Plus } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, Check } from "lucide-react";
 import PageHeader from "@/shared/components/PageHeader/PageHeader";
-import { getAdminSocket } from "@/services/realtime";
-import { getAdminOrder, getAvailableDelegates, handOverOrderToDelegate, updateAdminOrderStatus } from "../services/adminOrdersGateway";
+import { AsyncState, ConfirmAction, ConflictDialog, Money } from "@/shared/components";
+import { useAuthStore } from "@/store/authStore";
+import { can } from "@/modules/auth/permissions/permission";
+import { beginOperation, finishOperation } from "@/api/idempotency";
+import { useRealtimeRoom } from "@/realtime/useRealtimeRoom";
+import { isConflict } from "@/api/apiError";
+import { useCancelOrder, useCompleteTakeaway, useReadyOrderItem } from "../hooks/order.mutations";
+import { useOrderDetails } from "../hooks/order.queries";
+import { deliveryApi } from "../../delegates/api/delivery.api";
 import "../styles/BusyCardPage.css";
 
-const statusText = { PENDING:"لم يتم التأكيد", CONFIRMED:"لم يتم التأكيد", PREPARING:"جاري التحضير", READY:"جاهز", ASSIGNED_TO_DELEGATE:"جاهز", OUT_FOR_DELIVERY:"جاهز", DELIVERED:"جاهز", COMPLETED:"جاهز", CANCELLED:"لم يتم التأكيد" };
+const useOrderDetailsQuery = (id) => {
+  const details = useOrderDetails(id);
+  return { ...details, data: details.data ? { order: details.data.order, items: details.data.items || [], timeline: details.data.timeline || [], payment: details.data.payment ?? null, delivery: details.data.delivery ?? null } : details.data };
+};
+
+const statusText = { CONFIRMED: "مؤكد", PREPARING: "جاري التحضير", READY: "جاهز", OUT_FOR_DELIVERY: "خارج للتوصيل", COMPLETED: "مكتمل", CANCELLED: "ملغي" };
+
+function AssignDelegate({ orderId, orderVersion, disabled }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const delegatesQuery = useQuery({ queryKey: ["delegates", "available"], queryFn: () => deliveryApi.screen({ status: "ACTIVE", page: 1, limit: 10 }), enabled: open, staleTime: 15 * 1000 });
+  const assign = useMutation({
+    mutationFn: ({ delegateId, expectedOrderVersion }) => deliveryApi.assign(orderId, { delegateId, expectedOrderVersion }, beginOperation(`delivery:assign:${orderId}`)),
+    onSuccess: async () => { finishOperation(`delivery:assign:${orderId}`); setOpen(false); await queryClient.invalidateQueries({ queryKey: ["orders"] }); },
+    onError: (e) => { finishOperation(`delivery:assign:${orderId}`); setError(e?.response?.data?.error?.messageAr || e.message); },
+  });
+  const options = (delegatesQuery.data?.delegates || []).filter((d) => (d.activeOrderCount ?? 0) < (d.maxActiveOrders ?? 0));
+  if (!open) return <button className="btn-finish" disabled={disabled} onClick={() => { setError(""); setOpen(true); }}>تسليم للمندوب</button>;
+  return <div className="delegate-dialog" role="dialog" aria-modal="true"><div className="delegate-dialog__content">
+    <h3>تسليم الطلب للمندوب</h3>
+    {error && <p role="alert">{error}</p>}
+    {delegatesQuery.isLoading ? <p>جاري التحميل...</p> : options.length ? options.map((delegate) => (
+      <button key={delegate.id} disabled={assign.isPending} onClick={() => assign.mutate({ delegateId: delegate.id, expectedOrderVersion: orderVersion })}>{delegate.name} — {delegate.phone}</button>
+    )) : <p>لا يوجد مندوب متاح للتسليم حاليًا</p>}
+    <button onClick={() => { setOpen(false); assign.reset(); }}>إلغاء</button>
+  </div></div>;
+}
 
 export default function BusyCardPage() {
   const { type, id } = useParams();
   const navigate = useNavigate();
-  const [order, setOrder] = useState(null);
+  const permissions = useAuthStore((state) => state.permissions);
   const [activeTab, setActiveTab] = useState("orders");
-  const [error, setError] = useState("");
-  const [delegates, setDelegates] = useState([]);
-  const [assigning, setAssigning] = useState(false);
-  const [advancing, setAdvancing] = useState(false);
-  const [confirmingItemId, setConfirmingItemId] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [actionError, setActionError] = useState("");
 
-  const load = useCallback(() => getAdminOrder(id).then(setOrder).catch((e) => setError(e.response?.data?.message || e.message)), [id]);
+  const query = useOrderDetailsQuery(id);
+  const cancelOrder = useCancelOrder();
+  const completeTakeaway = useCompleteTakeaway();
+  const readyItem = useReadyOrderItem();
+  useRealtimeRoom({ scope: `order:${id}`, rooms: ["admin:orders"], enabled: Boolean(id), onEvent: () => query.refetch() });
 
-  useEffect(() => {
-    load();
-    const socket = getAdminSocket();
-    // order:updated carries the full order — apply locally, no refetch.
-    const apply = (payload) => { const incoming = payload?.order; if (incoming && Number(incoming.id) === Number(id)) { setOrder(incoming); setError(""); } };
-    socket.on("order:updated", apply);
-    const patchItem = (payload) => {
-      if (Number(payload?.orderId) !== Number(id)) return;
-      setOrder((current) => current && ({ ...current, status: payload.orderStatus || current.status,
-        items: current.items.map((item) => Number(item.id) === Number(payload.itemId) ? { ...item, status: payload.status } : item) }));
-    };
-    socket.on("order:item:updated", patchItem);
-    socket.on("connect", load);
-    return () => { socket.off("order:updated", apply); socket.off("order:item:updated", patchItem); socket.off("connect", load); };
-  }, [load, id]);
+  const order = query.data?.order || null;
+  const items = query.data?.items || [];
+  const timeline = query.data?.timeline || [];
 
-  const sectionPath = order?.fulfillmentType === "DINE_IN" ? `/admin/orders/tables/${order.table}`
-    : type === "takeaway" ? "/admin/orders/takeaway" : "/admin/orders/online";
+  const sectionPath = order?.fulfillmentType === "DINE_IN" ? "/admin/orders/tables" : type === "takeaway" ? "/admin/orders/takeaway" : "/admin/orders/online";
+  const pending = cancelOrder.isPending || completeTakeaway.isPending || readyItem.isPending;
+  const conflict = [cancelOrder, completeTakeaway, readyItem].find((m) => m.isError && isConflict(m.error));
+  const resetConflicts = () => { cancelOrder.resetAttempt(); completeTakeaway.resetAttempt(); readyItem.resetAttempt(); };
 
-  const confirmCustomerOrder = async (item) => {
-    if (order.channel !== "CUSTOMER_WEB" || order.status !== "PENDING" || item.status !== "PENDING" || confirmingItemId) return;
-    setConfirmingItemId(item.id);
-    try { setError(""); await updateAdminOrderStatus(order.id, "CONFIRMED"); navigate(sectionPath, { replace: true }); }
-    catch (reason) { setError(reason.response?.data?.message || reason.message); }
-    finally { setConfirmingItemId(null); }
-  };
-
-  const advance = async () => {
-    if (advancing) return;
-    setAdvancing(true);
-    try {
-      setError("");
-      if (order.status === "READY" && order.fulfillmentType === "DELIVERY") {
-        setDelegates(await getAvailableDelegates());
-        setAssigning(true);
-        return;
-      }
-      if (order.status === "READY" && order.fulfillmentType === "PICKUP") {
-        await updateAdminOrderStatus(order.id, "COMPLETED");
-        navigate("/admin/orders/online", { replace: true });
-        return;
-      }
-      if (order.status === "PENDING") { await updateAdminOrderStatus(order.id, "CONFIRMED"); navigate(sectionPath, { replace: true }); }
-    } catch (e) { setError(e.response?.data?.message || e.message); }
-    finally { setAdvancing(false); }
-  };
-
-  const assign = async (delegateId) => {
-    try {
-      await handOverOrderToDelegate(order.id, delegateId);
-      setAssigning(false);
-      navigate("/admin/orders/online", { replace: true });
-    } catch (e) { setError(e.response?.data?.message || e.message); }
-  };
-
-  // إلغاء الطلب بالكامل: يعيد المخزون تلقائيًا ويشيله من كل القوائم عبر السوكيت
-  const cancelOrder = async () => {
+  const cancel = async (reason) => {
     if (cancelling) return;
-    setCancelling(true);
-    try {
-      setError("");
-      await updateAdminOrderStatus(order.id, "CANCELLED");
-      navigate(-1);
-    } catch (e) { setError(e.response?.data?.message || e.message); }
+    setCancelling(true); setActionError("");
+    try { await cancelOrder.mutateAsync({ orderId: id, body: { reason, expectedVersion: order.version } }); navigate(-1); }
+    catch (e) { setActionError(e?.response?.data?.error?.messageAr || e.message); }
     finally { setCancelling(false); setConfirmingCancel(false); }
   };
-
-  if (!order) return <div className="busy-card-page">{error ? <p role="alert">{error}</p> : <p>جاري التحميل...</p>}</div>;
-
-  const cardTitle = order.fulfillmentType === "DINE_IN" ? `طاولة ${order.table}` : `طلب ${order.orderNumber}`;
-  const actionText = order.status === "READY"
-    ? (order.fulfillmentType === "DELIVERY" ? "تسليم للمندوب" : "تسليم للعميل")
-    : order.status === "PENDING" ? "تأكيد الطلب" : "تحديث الحالة";
+  const complete = async () => {
+    setActionError("");
+    try { await completeTakeaway.mutateAsync({ orderId: id, body: { expectedVersion: order.version, payment: { method: "CASH", amount: order.balanceDue } } }); query.refetch(); }
+    catch (e) { setActionError(e?.response?.data?.error?.messageAr || e.message); }
+  };
+  const markItemReady = async (item) => {
+    setActionError("");
+    try { await readyItem.mutateAsync({ itemId: item.id, body: { expectedItemVersion: item.version, expectedOrderVersion: order.version } }); }
+    catch (e) { setActionError(e?.response?.data?.error?.messageAr || e.message); }
+  };
 
   return (
     <div className="busy-card-page">
-      <PageHeader title={`تفاصيل ${cardTitle}`} breadcrumbs={["الطلبات", cardTitle]} />
-      {error && <p role="alert">{error}</p>}
-      <div className="busy-card-header">
-        <button className="btn-back" onClick={() => navigate(-1)}><ArrowRight />رجوع</button>
-        <div className="card-title-box">
-          <span className="card-title">{cardTitle}</span>
-          {order.channel === "CUSTOMER_WEB" && <span className="card-badge-outside">من الخارج</span>}
-          <span className="card-status">{statusText[order.status]}</span>
-        </div>
-      </div>
-
-      <div className="busy-card-tabs">
-        <button className={`tab-btn ${activeTab === "orders" ? "active" : ""}`} onClick={() => setActiveTab("orders")}>الطلبات ({order.items.length})</button>
-        <button className={`tab-btn ${activeTab === "tracking" ? "active" : ""}`} onClick={() => setActiveTab("tracking")}>تتبع الطلب</button>
-      </div>
-
-      <div className="busy-card-content">
-        {activeTab === "orders" ? (
-          <div className="orders-list">
-            <div className="order-card">
-              <div className="order-card-header">
-                <span className="order-number">طلب {order.orderNumber}</span>
-                <span>{new Date(order.createdAt).toLocaleTimeString("ar-EG")}</span>
-              </div>
-              <div className="order-customer">{order.customerName || `طاولة ${order.table}`}</div>
-              <div className="order-items">
-                {order.items.map((item) => (
-                  <div className="order-item" key={item.id}>
-                    <div className="order-item-top">
-                      <span className="item-qty">×{Number(item.quantity)}</span>
-                      {order.channel === "CUSTOMER_WEB" && order.status === "PENDING" && item.status === "PENDING" && <button className="btn-toggle-status" disabled={Boolean(confirmingItemId)} onClick={() => confirmCustomerOrder(item)} aria-label="تأكيد الطلب الجديد" title="تأكيد الطلب"><CheckCircle2 /></button>}
-                    </div>
-                    <div className="order-item-info">
-                      <span className="item-name">{item.product.name}</span>
-                      <span className="item-variant">{item.typeName} - {item.sizeName || item.productSize.name}</span>
-                    </div>
-                    <div className="order-item-bottom">
-                      <span className="item-price">{Number(item.totalPrice).toFixed(2)} ج.م</span>
-                      <span className={`item-status ${item.status === "READY" ? "ready" : ""}`}>{statusText[item.status]}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+      <PageHeader title={order ? `تفاصيل طلب ${order.orderNumber}` : "تفاصيل الطلب"} breadcrumbs={["الطلبات", order?.orderNumber || ""]} />
+      <AsyncState loading={query.isLoading} error={query.error} onRetry={query.refetch} empty={!query.isLoading && !order} emptyText="الطلب غير موجود">
+        {order && <>
+          <div className="busy-card-header">
+            <button className="btn-back" onClick={() => navigate(-1)}><ArrowRight />رجوع</button>
+            <div className="card-title-box">
+              <span className="card-title">طلب {order.orderNumber}</span>
+              {order.channel === "CUSTOMER_WEB" && <span className="card-badge-outside">من الخارج</span>}
+              <span className="card-status">{statusText[order.status] || order.status}</span>
             </div>
           </div>
-        ) : (
-          <div className="tracking-card">
-            <div className="tracking-grid">
-              <div className="tracking-mini-card"><span>رقم الطلب</span><strong>{order.orderNumber}</strong></div>
-              <div className="tracking-mini-card"><span>نوع الطلب</span><strong>{order.fulfillmentType === "DELIVERY" ? "توصيل" : order.fulfillmentType === "PICKUP" ? "تيك أواي" : "طاولة"}</strong></div>
-              {order.channel === "CUSTOMER_WEB" && <div className="tracking-mini-card"><span>رقم الهاتف</span><strong>{order.phone || "—"}</strong></div>}
-              <div className="tracking-mini-card"><span>الحالة</span><strong>{statusText[order.status]}</strong></div>
-              {order.delegate && <div className="tracking-mini-card"><span>المندوب</span><strong>{order.delegate.name}</strong></div>}
-            </div>
-            {order.statusHistory?.length > 0 && (
-              <div className="tracking-steps">
-                {order.statusHistory.map((step) => (
-                  <div className="tracking-step-card" key={step.id}>
-                    <strong>{statusText[step.toStatus]}</strong>
-                    <span>{new Date(step.createdAt).toLocaleString("ar-EG")}</span>
-                  </div>
-                ))}
+          {(actionError || cancelOrder.isError || completeTakeaway.isError || readyItem.isError) && !conflict && <p role="alert">{actionError || cancelOrder.error?.message || completeTakeaway.error?.message || readyItem.error?.message}</p>}
+
+          <div className="busy-card-tabs">
+            <button className={`tab-btn ${activeTab === "orders" ? "active" : ""}`} onClick={() => setActiveTab("orders")}>الطلبات ({items.length})</button>
+            <button className={`tab-btn ${activeTab === "tracking" ? "active" : ""}`} onClick={() => setActiveTab("tracking")}>تتبع الطلب</button>
+          </div>
+
+          <div className="busy-card-content">
+            {activeTab === "orders" ? (
+              <div className="orders-list"><div className="order-card">
+                <div className="order-card-header">
+                  <span className="order-number">طلب {order.orderNumber}</span>
+                  <span>{order.createdAt ? new Date(order.createdAt).toLocaleTimeString("ar-EG") : "—"}</span>
+                </div>
+                <div className="order-customer">{order.customer?.name || order.customer?.phone || "—"}</div>
+                <div className="order-items">
+                  {items.map((item) => (
+                    <div className="order-item" key={item.id}>
+                      <div className="order-item-top">
+                        <span className="item-qty">×{item.quantity}</span>
+                        {item.status === "PREPARING" && can(permissions, "preparation.update") && <button className="btn-toggle-status" disabled={pending} onClick={() => markItemReady(item)} aria-label={`تعليم ${item.productName} جاهز`} title="تعليم جاهز"><Check /></button>}
+                      </div>
+                      <div className="order-item-info">
+                        <span className="item-name">{item.productName}</span>
+                        <span className="item-variant">{item.typeName} - {item.sizeName}</span>
+                      </div>
+                      <div className="order-item-bottom">
+                        <span className="item-price"><Money value={item.lineSubtotal} /> ج.م</span>
+                        <span className={`item-status ${item.status === "READY" ? "ready" : ""}`}>{statusText[item.status] || item.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div></div>
+            ) : (
+              <div className="tracking-card"><div className="tracking-grid">
+                <div className="tracking-mini-card"><span>رقم الطلب</span><strong>{order.orderNumber}</strong></div>
+                <div className="tracking-mini-card"><span>نوع الطلب</span><strong>{order.fulfillmentType === "DELIVERY" ? "توصيل" : order.fulfillmentType === "TAKEAWAY" ? "تيك أواي" : "طاولة"}</strong></div>
+                <div className="tracking-mini-card"><span>الحالة</span><strong>{statusText[order.status] || order.status}</strong></div>
+                {query.data?.delivery && <div className="tracking-mini-card"><span>المندوب</span><strong>{query.data.delivery.delegateName || "—"}</strong></div>}
+              </div>
+                {timeline.length > 0 && <div className="tracking-steps">{timeline.map((step, index) => (
+                  <div className="tracking-step-card" key={step.sequence ?? index}><strong>{statusText[step.toStatus] || step.toStatus}</strong><span>{step.occurredAt ? new Date(step.occurredAt).toLocaleString("ar-EG") : "—"}</span></div>
+                ))}</div>}
               </div>
             )}
           </div>
-        )}
-      </div>
 
-      <div className="busy-card-footer">
-        {order.fulfillmentType === "DINE_IN" && (
-          <button className="btn-create-order" onClick={() => navigate(`/admin/orders/sales/table/${order.table}`)}><Plus />إضافة طلب للطاولة</button>
-        )}
-        <div className="total-amount">
-          <span>الإجمالي المستحق:</span>
-          <strong>{Number(order.total).toFixed(2)} ج.م</strong>
-        </div>
-        {((order.channel === "CUSTOMER_WEB" && order.status === "PENDING") || order.status === "READY") && (
-          <>
-            <button className="btn-cancel-order" disabled={advancing || cancelling} onClick={() => setConfirmingCancel(true)}>{cancelling ? "جاري الإلغاء..." : "إلغاء الطلب"}</button>
-            <button className="btn-finish" disabled={advancing} onClick={advance}>{advancing ? "جاري..." : actionText}</button>
-          </>
-        )}
-      </div>
-
-      {confirmingCancel && (
-        <div className="delegate-dialog" role="dialog" aria-modal="true">
-          <div className="delegate-dialog__content">
-            <h3>تأكيد إلغاء الطلب</h3>
-            <p>سيتم إرجاع كل المخزون المحجوز وحذف الطلب من جميع الشاشات. هل تريد المتابعة؟</p>
-            <button onClick={cancelOrder} disabled={cancelling}>{cancelling ? "جاري الإلغاء..." : "نعم، إلغاء الطلب"}</button>
-            <button onClick={() => setConfirmingCancel(false)} disabled={cancelling}>تراجع</button>
+          <div className="busy-card-footer">
+            <div className="total-amount"><span>الإجمالي المستحق:</span><strong><Money value={order.balanceDue} /> ج.م</strong></div>
+            {order.status === "READY" && order.fulfillmentType === "DELIVERY" && can(permissions, "delivery.manage") && <AssignDelegate orderId={id} orderVersion={order.version} disabled={pending} />}
+            {order.status === "READY" && order.fulfillmentType === "TAKEAWAY" && can(permissions, "orders.complete") && <button className="btn-finish" disabled={pending} onClick={complete}>{completeTakeaway.isPending ? "جاري..." : "تسليم للعميل"}</button>}
+            {["CONFIRMED", "PREPARING", "READY"].includes(order.status) && can(permissions, "orders.cancel") && <>
+              <button className="btn-cancel-order" disabled={pending || cancelling} onClick={() => setConfirmingCancel(true)}>{cancelling ? "جاري الإلغاء..." : "إلغاء الطلب"}</button>
+            </>}
           </div>
-        </div>
-      )}
 
-      {assigning && (
-        <div className="delegate-dialog" role="dialog" aria-modal="true">
-          <div className="delegate-dialog__content">
-            <h3>تسليم الطلب للمندوب</h3>
-            {delegates.length ? delegates.map((delegate) => (
-              <button key={delegate.id} onClick={() => assign(delegate.id)}>{delegate.name} — {delegate.phone}</button>
-            )) : <p>لا يوجد مندوب متاح للتسليم حاليًا</p>}
-            <button onClick={() => setAssigning(false)}>إلغاء</button>
-          </div>
-        </div>
-      )}
-
+          {confirmingCancel && (
+            <div className="delegate-dialog" role="dialog" aria-modal="true"><div className="delegate-dialog__content">
+              <h3>تأكيد إلغاء الطلب</h3>
+              <ConfirmAction title="إلغاء الطلب" message="سيتم إرجاع المخزون المحجوز حسب قواعد الباك." confirmLabel="نعم، إلغاء الطلب" danger pending={cancelling} requireReason onConfirm={cancel}>
+                <span>تأكيد</span>
+              </ConfirmAction>
+              <button onClick={() => setConfirmingCancel(false)} disabled={cancelling}>تراجع</button>
+            </div></div>
+          )}
+          <ConflictDialog open={Boolean(conflict)} onClose={() => { resetConflicts(); }} onReload={async () => { resetConflicts(); await query.refetch(); }} pending={false} />
+        </>}
+      </AsyncState>
     </div>
   );
 }

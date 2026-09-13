@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Monitor, LayoutGrid, ShoppingBag, Globe } from "lucide-react";
+import { Monitor, LayoutGrid, ShoppingBag, History, ReceiptText, CircleX } from "lucide-react";
 import PageHeader from "@/shared/components/PageHeader/PageHeader";
 import "../styles/OrdersHomePage.css";
 
@@ -14,13 +14,11 @@ function OrdersHomePage() {
             />
             <div className="orders-home-content">
                 <div className="orders-home-grid">
-                    <div
-                        className="orders-home-card orders-home-card--incoming"
-                        onClick={() => navigate("/admin/orders/incoming")}
-                    >
-                        <Globe size={64} />
-                        <h2>من الخارج (بانتظار التأكيد)</h2>
-                    </div>
+                    <div className="orders-home-card" onClick={() => navigate("/admin/orders/preparation")}><Monitor size={64}/><h2>قسم التحضير</h2></div>
+                    <div className="orders-home-card" onClick={() => navigate("/admin/orders/history")}><History size={64}/><h2>سجل الطلبات</h2></div>
+                    <div className="orders-home-card" onClick={() => navigate("/admin/invoices")}><ReceiptText size={64}/><h2>فواتير الطلبات</h2></div>
+                    <div className="orders-home-card" onClick={() => navigate("/admin/orders/cancellations")}><CircleX size={64}/><h2>طلبات الإلغاء</h2></div>
+                    <div className="orders-home-card" onClick={() => navigate("/admin/orders/table-proposals")}><LayoutGrid size={64}/><h2>طلبات جرسون الطاولات</h2></div>
                     <div
                         className="orders-home-card orders-home-card--online"
                         onClick={() => navigate("/admin/orders/online")}

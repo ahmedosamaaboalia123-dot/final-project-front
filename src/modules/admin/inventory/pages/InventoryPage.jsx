@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Package } from "lucide-react";
 import PageHeader from "@/shared/components/PageHeader/PageHeader";
 import AddMaterialForm from "../components/AddMaterialForm";
 import MaterialsTable from "../components/MaterialsTable";
 import WithdrawnMaterialsTable from "../components/WithdrawnMaterialsTable";
-import { getAdminSocket } from "@/services/realtime";
+import { useRealtimeRoom } from "@/realtime/useRealtimeRoom";
 
 const INVENTORY_TABS = [
     { id: "raw", label: "المواد الخام" },
@@ -15,17 +15,16 @@ const INVENTORY_TABS = [
 function InventoryPage() {
     const [activeTab, setActiveTab] = useState("raw");
     const queryClient = useQueryClient();
-    useEffect(() => {
-        const socket = getAdminSocket();
-        const refreshInventory = () => {
-            queryClient.invalidateQueries({ queryKey: ["raw-materials"] });
-            queryClient.invalidateQueries({ queryKey: ["raw-material"] });
-            queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
-            queryClient.invalidateQueries({ queryKey: ["warnings"] });
-        };
-        socket.on("inventory:updated", refreshInventory);
-        return () => socket.off("inventory:updated", refreshInventory);
-    }, [queryClient]);
+    useRealtimeRoom({
+        scope: "inventory:list", rooms: ["admin:orders"], enabled: true,
+        onEvent: (event) => {
+            if (["order.created", "order.cancelled", "order.completed"].includes(event?.type)) {
+                queryClient.invalidateQueries({ queryKey: ["raw-materials"] });
+                queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
+                queryClient.invalidateQueries({ queryKey: ["warnings"] });
+            }
+        },
+    });
 
     return (
         <div className="inventory-page">

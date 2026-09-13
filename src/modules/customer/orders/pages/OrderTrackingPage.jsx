@@ -30,8 +30,10 @@ import { getActiveTableOrder } from "../../../table/services/tableGateway";
 import { getPublicOrderTracking, lookupOrderByPhone } from "../../checkout/services/orderGateway";
 import { getCustomerProfile } from "../../checkout/services/checkoutCustomerService";
 import { createTrackingSocket } from "@/services/realtime";
+import { customerStorage } from "../../services/customerStorage";
 import OrderBarcode from "../../checkout/components/OrderBarcode";
 import CustomerInvoiceModal from "../components/CustomerInvoiceModal";
+import CustomerOrderActions from "../components/CustomerOrderActions";
 import "../styles/CustomerOrders.css";
 
 const maskPhone = (phone = "") => {
@@ -140,7 +142,14 @@ export default function OrderTrackingPage({ tableMode = false }) {
     try {
       const result = await lookupOrderByPhone({ orderNumber: num, phone: ph });
       if (result) {
-        setOrder(result);
+        const access = customerStorage.getOrderAccess(num);
+        if (access?.trackingReadToken) {
+          const tracked = await getPublicOrderTracking(num, access.trackingReadToken);
+          setOrder({ ...tracked, trackingToken: access.trackingReadToken });
+        } else {
+          setOrder(result);
+          setSearchError("تم التحقق من الطلب، لكن إجراءات المتابعة الكاملة تحتاج رمز الوصول المحفوظ على جهاز إنشاء الطلب.");
+        }
       } else {
         setOrder(null);
         setSearchError("لم نعثر على طلب بهذه البيانات");
@@ -711,6 +720,7 @@ export default function OrderTrackingPage({ tableMode = false }) {
         </section>
 
         {/* Bottom Actions */}
+        {!tableMode && <CustomerOrderActions order={order} onChanged={async () => { const access = customerStorage.getOrderAccess(orderCode); if (access?.trackingReadToken) setOrder(await getPublicOrderTracking(orderCode, access.trackingReadToken)); }}/>} 
         <div className="tracking-bottom-actions-bar">
           <button
             type="button"

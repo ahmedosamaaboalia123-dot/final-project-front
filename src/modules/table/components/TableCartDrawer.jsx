@@ -88,7 +88,7 @@ export default function TableCartDrawer({ isOpen, onClose }) {
           >
             <Sparkles size={16} className="text-coffee-gold" />
             <span>
-              سيتم إرسال الطلب مباشرة إلى الجرسون والتحضير لطاولة رقم <strong>{tableNumber}</strong>.
+              ستُرسل السلة كمقترح للجرسون. لن يبدأ التحضير أو خصم المخزون قبل موافقة الإدارة لطاولة رقم <strong>{tableNumber}</strong>.
             </span>
           </div>
 
@@ -225,7 +225,7 @@ export default function TableCartDrawer({ isOpen, onClose }) {
               }}
             >
               <ShoppingBag size={18} />
-              <span>{isSubmitting ? "جاري إرسال الطلب..." : `تأكيد طلب طاولة رقم ${tableNumber}`}</span>
+              <span>{isSubmitting ? "جاري إرسال الطلب..." : `طلب الجرسون لطاولة رقم ${tableNumber}`}</span>
             </button>
             <button type="button" onClick={handleCallWaiter} style={{ width: "100%", minHeight: "44px", marginTop: "8px", border: "1px solid #E8DDCE", borderRadius: "12px", background: "#fff", cursor: "pointer" }}><Bell size={16}/> استدعاء الجرسون بدلًا من ذلك</button>
           </div>

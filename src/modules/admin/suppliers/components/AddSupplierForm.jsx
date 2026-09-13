@@ -1,22 +1,28 @@
 import { useState } from "react";
 import { Briefcase, PlusCircle, XCircle } from "lucide-react";
-import useCreateSupplier from "../hooks/useCreateSupplier";
+import { useAuthStore } from "@/store/authStore";
+import { can } from "@/modules/auth/permissions/permission";
+import { useCreateSupplier } from "../hooks/supplier.mutations";
+import { supplierFormSchema } from "../schemas/supplier.schema";
 import "./AddSupplierForm.css";
 
-const emptyForm={name:"",contactPerson:"",phone:"",supplierType:"",city:""};
-
-function AddSupplierForm(){
- const [form,setForm]=useState(emptyForm);
- const mutation=useCreateSupplier({onSuccess:()=>setForm(emptyForm)});
- const change=e=>setForm(prev=>({...prev,[e.target.name]:e.target.value}));
- const submit=e=>{e.preventDefault();mutation.mutate({name:form.name.trim(),contactPerson:form.contactPerson.trim(),phone:form.phone.trim(),supplierType:form.supplierType.trim(),city:form.city.trim(),supplierCategory:"عام",creditLimit:0,openingBalance:0})};
- const fields=[
-  ["name","اسم المورد","text",true],["contactPerson","اسم المسؤول","text",true],["phone","رقم الهاتف","tel",true],
-  ["supplierType","نوع المورد","text",true],["city","المدينة","text",true]
- ];
- return <div className="add-supplier-card"><div className="form-card-header"><div className="form-header-title"><div className="header-plus-icon"><PlusCircle size={18}/></div><span>إضافة مورد جديد</span></div></div>
- <form onSubmit={submit} className="supplier-form"><div className="form-grid">{fields.map(([name,label,type,required])=><div className="form-group" key={name}><label className="form-label">{label}{required&&<span className="required-star"> *</span>}</label><input className="form-input" name={name} type={type} value={form[name]} onChange={change} required={required} min={type==="number"?0:undefined}/></div>)}</div>
- {mutation.isError&&<p className="form-api-error">{mutation.error?.response?.data?.message||"تعذر حفظ المورد. راجع البيانات وحاول مرة أخرى."}</p>}
- <div className="form-actions-bar"><button type="submit" className="save-supplier-btn" disabled={mutation.isPending}><Briefcase size={18}/><span>{mutation.isPending?"جاري الحفظ...":"حفظ المورد"}</span></button><button type="button" className="cancel-supplier-btn" onClick={()=>setForm(emptyForm)}><XCircle size={18}/><span>إلغاء</span></button></div></form></div>
+const emptyForm = { name: "", contactPerson: "", phone: "", city: "" };
+export default function AddSupplierForm() {
+  const permissions = useAuthStore((state) => state.permissions);
+  const [form, setForm] = useState(emptyForm); const [validationError, setValidationError] = useState("");
+  const mutation = useCreateSupplier({ onSuccess: () => { setForm(emptyForm); setValidationError(""); } });
+  if (!can(permissions, "suppliers.create")) return null;
+  const change = (event) => { mutation.resetAttempt(); setValidationError(""); setForm((current) => ({ ...current, [event.target.name]: event.target.value })); };
+  const submit = (event) => {
+    event.preventDefault(); const result = supplierFormSchema.safeParse(form);
+    if (!result.success) { setValidationError(result.error.issues[0]?.message || "راجع البيانات"); return; }
+    mutation.mutate(result.data);
+  };
+  return <div className="add-supplier-card"><div className="form-card-header"><div className="form-header-title"><div className="header-plus-icon"><PlusCircle size={18}/></div><span>إضافة مورد جديد</span></div></div>
+    <form onSubmit={submit} className="supplier-form"><div className="form-grid">
+      {[["name","اسم المورد","text"],["contactPerson","اسم المسؤول","text"],["phone","رقم الهاتف","tel"],["city","المدينة","text"]].map(([name,label,type]) => <div className="form-group" key={name}><label className="form-label" htmlFor={`supplier-${name}`}>{label}<span className="required-star"> *</span></label><input id={`supplier-${name}`} className="form-input" name={name} type={type} value={form[name]} onChange={change} required/></div>)}
+    </div>
+    {(validationError || mutation.isError) && <p className="form-api-error" role="alert">{validationError || mutation.error?.message || "تعذر حفظ المورد"}</p>}
+    <div className="form-actions-bar"><button type="submit" className="save-supplier-btn" disabled={mutation.isPending}><Briefcase size={18}/><span>{mutation.isPending ? "جاري الحفظ..." : "حفظ المورد"}</span></button><button type="button" className="cancel-supplier-btn" disabled={mutation.isPending} onClick={() => { mutation.resetAttempt(); setForm(emptyForm); setValidationError(""); }}><XCircle size={18}/><span>إلغاء</span></button></div></form>
+  </div>;
 }
-export default AddSupplierForm;

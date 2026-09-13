@@ -28,23 +28,24 @@ const iconMap = {
     sales: ShoppingCart,
     products: Package,
     inventory: Warehouse,
-    invoices: FileText,
-    reports: BarChart3,
+    purchases: FileText,
     employees: User,
     suppliers: Truck,
     delegates: Truck,
     settings: Settings,
     warnings: AlertTriangle,
-    returns: RotateCcw,
+    "purchase-returns": RotateCcw,
     drawer: Wallet,
     orders: ClipboardList,
-    orders_online: Monitor,
-    orders_tables: LayoutGrid,
-    orders_history: History,
-    orders_preparation: ChefHat,
-    orders_table_services: Bell,
-    customers: UserPlus
-    ,financial_reports: BarChart3
+    "orders-online": Monitor,
+    "orders-tables": LayoutGrid,
+    "orders-history": History,
+    preparation: ChefHat,
+    "table-services": Bell,
+    customers: UserPlus,
+    reports: BarChart3,
+    audit: History,
+    reviews: ClipboardList,
 };
 
 
@@ -56,7 +57,7 @@ function SidebarItem({item}){
 
     const Icon =
 
-    iconMap[item.page_key]
+    iconMap[item.iconKey]
     ||
     Package;
 
@@ -116,7 +117,7 @@ function SidebarItem({item}){
             <span className="sidebar-item__text">
 
 
-                {item.page_name}
+                {item.pageName}
 
 
             </span>

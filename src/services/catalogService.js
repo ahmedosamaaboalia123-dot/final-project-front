@@ -155,6 +155,71 @@ export function isCatalogFromBackend() {
 }
 
 // ---------------------------------------------------------------------------
+// v2 backend catalog (/v1/catalog): { products:[{id,name,description,
+// image:{id},category:{id},types:[{id,name,sizes:[{id,name,price}]}]}],
+// categories:[{id,name}] }. Normalized to the exact same menu item shape so
+// screens work against either backend during the transition.
+// ---------------------------------------------------------------------------
+let v1Cache = { data: null, fetchedAt: 0, inFlight: null };
+
+const normalizeV1MenuItem = (raw, categoryNameById) => {
+  const categoryName = categoryNameById.get(String(raw?.category?.id)) || "";
+  const legacy = {
+    ...raw,
+    categoryName,
+    category: categoryName,
+    image: typeof raw?.image === "string" ? raw.image : FALLBACK_IMAGE,
+    sizes: (raw?.types || []).flatMap((t) => t?.sizes || []),
+    variants: (raw?.types || []).map((t) => ({ type: t.name, sizes: t.sizes || [] })),
+  };
+  return normalizeMenuItem(legacy);
+};
+
+export async function getV1Menu() {
+  const now = Date.now();
+  if (v1Cache.data && now - v1Cache.fetchedAt < CACHE_TTL_MS) {
+    return v1Cache.data;
+  }
+  if (v1Cache.inFlight) return v1Cache.inFlight;
+
+  const run = (async () => {
+    try {
+      const payload = await apiClient.get(endpoints.v1.catalog);
+      const data = innerData(payload) || {};
+      const categories = Array.isArray(data.categories) ? data.categories : [];
+      const categoryNameById = new Map(categories.map((c) => [String(c.id), c.name || ""]));
+      const list = Array.isArray(data.products) ? data.products : [];
+      const catalog = {
+        items: list.map((p) => normalizeV1MenuItem(p, categoryNameById)),
+        categories: categories.map((c) => ({
+          id: categoryIdFromName(c.name),
+          title: c.name || "الكل",
+          englishTitle: "",
+          icon: "Coffee",
+        })),
+        fromBackend: true,
+        backendVersion: "v1",
+        fetchedAt: Date.now(),
+      };
+      v1Cache = { data: catalog, fetchedAt: Date.now(), inFlight: null };
+      return catalog;
+    } catch (err) {
+      console.error("catalogService: failed to load v1 menu", err);
+      v1Cache = { data: null, fetchedAt: 0, inFlight: null };
+      return { items: [], categories: [], fromBackend: false, backendVersion: "v1", fetchedAt: 0 };
+    }
+  })();
+
+  v1Cache.inFlight = run;
+  return v1Cache.inFlight;
+}
+
+export function getV1MenuItemById(id) {
+  const list = v1Cache.data?.items || [];
+  return list.find((p) => String(p.id) === String(id)) || null;
+}
+
+// ---------------------------------------------------------------------------
 // Public product categories (real ProductCategory records from the backend).
 // ---------------------------------------------------------------------------
 let catCache = { data: null, fetchedAt: 0, inFlight: null };
