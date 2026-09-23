@@ -21,6 +21,7 @@ export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubm
   const [customer, setCustomer] = useState(EMPTY_CUSTOMER);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   // Prefill name + phone from the saved customer profile when the modal opens,
   // so the customer's last-used details are ready without re-typing.
@@ -63,12 +64,19 @@ export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubm
   const handleSubmit = async () => {
     if (!validate() || items.length === 0) return;
     setIsSubmitting(true);
+    setSubmitError("");
     try {
       await onSubmit({ fulfillmentType, customer, items });
       // Save the customer's details so the tracking search + next checkout
       // auto-fill. Keep the data on screen (do not clear the form).
       if (!addToExistingOrder) saveCustomerProfile({ name: customer.name.trim(), phone: customer.phone.trim() });
       setErrors({});
+    } catch (error) {
+      setSubmitError(
+        error?.response?.data?.error?.messageAr ||
+          error?.message ||
+          "تعذر تأكيد الطلب، راجع البيانات وحاول مرة أخرى"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -125,6 +133,7 @@ export default function OrderCheckoutModal({ isOpen, items = [], onClose, onSubm
         </div>}
 
         <footer className="checkout-footer">
+          {submitError && <p className="checkout-submit-error" role="alert">{submitError}</p>}
           <div className="checkout-total"><span>الإجمالي</span><strong>{total} ج.م</strong>{deliveryFee > 0 && <small>يشمل {deliveryFee} ج.م توصيل</small>}</div>
           <button type="button" className="checkout-primary-btn" disabled={isSubmitting} onClick={handleSubmit}>
             {isSubmitting ? "جاري الحفظ..." : addToExistingOrder ? "إضافة المنتجات للطلب" : "تأكيد وإنشاء الطلب"}

@@ -12,7 +12,7 @@ export default function TableBottomNav({
     { id: "home", label: "الرئيسية", icon: Home },
     { id: "menu", label: "المينيو", icon: Coffee },
     { id: "cart", label: "سلة الطاولة", icon: ShoppingCart, badge: tableCartCount },
-    { id: "orders", label: "طلباتي", icon: ClipboardList, badge: activeOrder ? "!" : null },
+    { id: "orders", label: "تتبع الطلبات", icon: ClipboardList, badge: activeOrder ? "!" : null },
     { id: "waiter", label: "الويتر", icon: Bell },
   ];
 

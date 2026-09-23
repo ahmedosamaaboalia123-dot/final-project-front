@@ -17,6 +17,16 @@
     --page-header-text-secondary: #8B7B6B;
 }
 
+.page-header--tabs-only {
+    padding: var(--space-sm) var(--page-padding) 0;
+    background: transparent;
+    border-bottom: none;
+}
+
+.page-header--tabs-only .page-header__container {
+    gap: 0;
+}
+
 .page-header__container {
     display: flex;
     flex-direction: column;

@@ -23,7 +23,6 @@ function MaterialSearchSelect({ line, onPick, disabled }) {
     page: 1,
     limit: 10,
     search: debounced || undefined,
-    status: "ACTIVE",
   });
   const materials = query.data?.materials || [];
 

@@ -13,6 +13,7 @@ const cleanReview = (review = {}) => ({
   fulfillmentType: review.fulfillmentType || "",
   rating: Number(review.rating ?? 0),
   comment: review.comment ?? null,
+  displayName: review.displayName ?? null,
   status: review.status || "VISIBLE",
   statusLabel: REVIEW_STATUSES[review.status] || review.status || "—",
   submittedAt: review.submittedAt ?? null,

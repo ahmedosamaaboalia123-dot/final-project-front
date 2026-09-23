@@ -49,7 +49,7 @@ const cleanRole = (role = {}) => ({
 
 const cleanPermission = (permission = {}) => ({
   ...permission,
-  id: str(permission.id),
+  id: str(permission.id ?? permission._id),
   key: str(permission.key),
   pageKey: str(permission.pageKey),
   action: str(permission.action),
@@ -104,12 +104,14 @@ export function toDevicesList(data = {}) {
 }
 
 export function toRolesList(data = {}) {
-  const roles = (Array.isArray(data) ? data : data.roles || []).map(cleanRole);
+  const raw = Array.isArray(data) ? data : data.roles || data.items || [];
+  const roles = raw.map(cleanRole);
   return { roles };
 }
 
 export function toPermissionsCatalog(data = {}) {
-  const permissions = (Array.isArray(data) ? data : data.permissions || []).map(cleanPermission);
+  const raw = Array.isArray(data) ? data : data.permissions || data.items || [];
+  const permissions = raw.map(cleanPermission);
   const byPage = new Map();
   for (const permission of permissions) {
     if (!byPage.has(permission.pageKey)) byPage.set(permission.pageKey, []);
@@ -138,8 +140,15 @@ export function toAttendanceDetails(data = {}) {
   };
 }
 
+const SYSTEM_ROLE_LABELS = Object.freeze({ Admin: "ادمن", Employee: "موظف" });
+
 export function toRoleOptions(roles = []) {
-  return roles
-    .map((role) => ({ value: str(role.id || role._id), label: `${role.name} (مستوى ${role.level})` }))
+  return (Array.isArray(roles) ? roles : [])
+    .filter((role) => {
+      if (!Object.prototype.hasOwnProperty.call(SYSTEM_ROLE_LABELS, role?.name)) return false;
+      if (role?.isSystem === undefined) return true;
+      return role.isSystem === true;
+    })
+    .map((role) => ({ value: str(role.id || role._id), label: SYSTEM_ROLE_LABELS[role.name] }))
     .filter((role) => role.value);
 }

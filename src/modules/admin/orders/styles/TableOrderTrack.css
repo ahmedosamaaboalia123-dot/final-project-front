@@ -4,6 +4,7 @@
   gap: var(--space-sm);
   height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--space-sm) var(--space-md);
 }
 
@@ -50,6 +51,17 @@
 .track-order-status--READY {
   background: var(--success-bg);
   color: var(--success);
+}
+
+.track-order-status--PREPARING,
+.track-order-status--CONFIRMED {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.track-order-status--CANCELLED {
+  background: var(--danger-bg, #fdecec);
+  color: var(--danger);
 }
 
 .track-order-status--COMPLETED {
@@ -100,6 +112,9 @@
   font-weight: var(--fw-semibold);
   color: var(--text-main);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .track-item__variant {

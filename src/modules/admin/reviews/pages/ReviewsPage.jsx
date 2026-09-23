@@ -67,6 +67,7 @@ function ReviewRow({ review, canModerate, onChanged }) {
       <tr>
         <td title={review.id}>{review.id ? review.id.slice(-6) : "—"}</td>
         <td title={review.orderId || ""}>{review.orderId ? review.orderId.slice(-6) : "—"}</td>
+        <td>{review.displayName || "ضيف"}</td>
         <td><span className="reviews-stars" aria-label={`التقييم ${review.rating} من 5`}>{stars(review.rating)}</span></td>
         <td className="reviews-comment">{review.comment || "—"}</td>
         <td>{review.statusLabel}</td>
@@ -81,7 +82,7 @@ function ReviewRow({ review, canModerate, onChanged }) {
       </tr>
       {canModerate && open && (
         <tr className="reviews-row reviews-row--expanded">
-          <td colSpan={7}>
+          <td colSpan={8}>
             <div className="review-manage">
               <form className="review-form" onSubmit={submitModeration}>
                 <h3>إشراف</h3>
@@ -169,7 +170,7 @@ export default function ReviewsPage() {
             <div className="reviews-table-wrap">
               <table className="reviews-table">
                 <thead>
-                  <tr><th>التقييم</th><th>الطلب</th><th>النجوم</th><th>التعليق</th><th>الحالة</th><th>التاريخ</th><th>إجراء</th></tr>
+                  <tr><th>التقييم</th><th>الطلب</th><th>الاسم</th><th>النجوم</th><th>التعليق</th><th>الحالة</th><th>التاريخ</th><th>إجراء</th></tr>
                 </thead>
                 <tbody>
                   {items.map((review) => (

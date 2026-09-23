@@ -5,7 +5,6 @@ import HeroBanner from "../components/HeroBanner";
 import SearchBar from "../components/SearchBar";
 import CategoryCards from "../components/CategoryCards";
 import BestSellersSection from "../components/BestSellersSection";
-import WeeklyOfferBanner from "../components/WeeklyOfferBanner";
 import CustomerReviews from "../components/CustomerReviews";
 import BranchInfoCard from "../components/BranchInfoCard";
 import CustomerFooter from "../components/CustomerFooter";
@@ -20,13 +19,14 @@ import NotificationsModal from "../components/NotificationsModal";
 import CartDrawer from "../components/CartDrawer";
 import CustomerNavDrawer from "../components/CustomerNavDrawer";
 import TrackOrdersModal from "../components/TrackOrdersModal";
-import RateCafeModal from "../components/RateCafeModal";
 import OrderCheckoutModal from "../../checkout/components/OrderCheckoutModal";
 import OrderSuccessModal from "../../checkout/components/OrderSuccessModal";
 import { useCreatePublicOrder } from "../../checkout/hooks/useCreatePublicOrder";
 
 import { MAIN_PAGE_DATA } from "../data/mainPageData";
-import { getTopProducts, getPublicMenu } from "@/services/catalogService";
+import { getTopProducts, getPublicMenu, getPublicCategories } from "@/services/catalogService";
+import { reviewsApi } from "@/modules/admin/reviews/api/reviews.api";
+import { toReviewCard } from "@/modules/customer/feedback/services/reviewFlow";
 import "../styles/CustomerMainPage.css";
 
 export default function CustomerMainPage() {
@@ -35,7 +35,6 @@ export default function CustomerMainPage() {
   const [selectedCategory, setSelectedCategory] = useState("coffee");
   const [activeBottomTab, setActiveBottomTab] = useState("home");
   const [recentlyAddedId, setRecentlyAddedId] = useState(null);
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Modals & Drawers states
@@ -47,17 +46,40 @@ export default function CustomerMainPage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false);
   const [isTrackOrdersOpen, setIsTrackOrdersOpen] = useState(false);
-  const [isRateCafeOpen, setIsRateCafeOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
   const createOrder = useCreatePublicOrder();
 
-  // Cart items state
-  const [cartItems, setCartItems] = useState([]);
+  // Cart items state (persisted locally so refresh before checkout keeps the cart)
+  const [cartItems, setCartItems] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("404_customer_cart_v1") || "[]");
+    } catch {
+      return [];
+    }
+  });
 
-  // Real "most ordered" products from the backend (joined with the live menu so
-  // prices / sizing / images are ready for the cart).
+  useEffect(() => {
+    try {
+      localStorage.setItem("404_customer_cart_v1", JSON.stringify(cartItems));
+    } catch {}
+  }, [cartItems]);
+
+  // Real data from backend
   const [topProducts, setTopProducts] = useState(null);
+  const [realCategories, setRealCategories] = useState([]);
+  const [latestReviews, setLatestReviews] = useState([]);
+  const CAFE_BRANCH = {
+    name: "فرع ايتاي البارود",
+    address: "محافظة البحيرة - مركز ايتاي البارود - شارع ابو بكر الصديق متفرع من شارع مجلس المدينة بجوار كنيسة العذراء مريم",
+    mapUrl: "https://www.google.com/maps?q=30.882471084594727,30.66588020324707&z=17&hl=en",
+    hours: "يوميا 8ص - 12ص",
+    phone: "01000000404",
+    image: "https://images.unsplash.com/photo-1445116572660-236099ec97a0?auto=format&fit=crop&w=800&q=80",
+    reception: "نستقبلك يومياً",
+    singleBranchText: "فرع واحد فقط",
+    tagline: "أقرب إليك دائماً",
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +92,8 @@ export default function CustomerMainPage() {
         .filter(Boolean);
       setTopProducts(joined);
     });
+    getPublicCategories().then((cats) => { if (!cancelled) setRealCategories(Array.isArray(cats) ? cats.filter((c) => c.isActive !== false) : []); });
+    reviewsApi.publicList({ page: 1, limit: 3 }).then((res) => { if (cancelled) return; const items = res?.items || res?.data || []; setLatestReviews(Array.isArray(items) ? items.slice(0,3).map(toReviewCard) : []); }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
@@ -78,15 +102,15 @@ export default function CustomerMainPage() {
     [cartItems]
   );
 
-  // Filter products by category & search query
-  const bestSellers = topProducts && topProducts.length > 0 ? topProducts : MAIN_PAGE_DATA.bestSellers;
+  // Filter: top products filtered by search (name + category)
+  const bestSellers = topProducts ?? [];
   const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return bestSellers;
     return bestSellers.filter((prod) => {
-      const matchesSearch =
-        !searchQuery.trim() ||
-        prod.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (prod.englishName || "").toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
+      const name = String(prod.name || "").toLowerCase();
+      const cat = String(prod.categoryName || prod.category || "").toLowerCase();
+      return name.includes(q) || cat.includes(q);
     });
   }, [searchQuery, bestSellers]);
 
@@ -137,11 +161,6 @@ export default function CustomerMainPage() {
     setCartItems(cartItems.filter((it) => it.id !== id));
   };
 
-  const handleApplyOffer = (code) => {
-    setAppliedCoupon(code);
-    showToast(`تم نسخ وتطبيق كود الخصم: ${code} 🎉`);
-  };
-
   const handleNavDrawerAction = (action) => {
     setIsNavDrawerOpen(false);
     if (action === "home") {
@@ -154,14 +173,12 @@ export default function CustomerMainPage() {
       navigate("/table/4");
     } else if (action === "chatbot" || action === "bot") {
       navigate("/customer/chatbot");
-    } else if (action === "offers") {
-      document.getElementById("offers-anchor")?.scrollIntoView({ behavior: "smooth" });
     } else if (action === "reviews") {
       document.getElementById("reviews-anchor")?.scrollIntoView({ behavior: "smooth" });
     } else if (action === "branch") {
       document.getElementById("branch-anchor")?.scrollIntoView({ behavior: "smooth" });
     } else if (action === "rate") {
-      setIsRateCafeOpen(true);
+      navigate("/customer/feedback");
     }
   };
 
@@ -172,7 +189,7 @@ export default function CustomerMainPage() {
     } else if (tabId === "menu") {
       navigate("/menu");
     } else if (tabId === "profile") {
-      setIsRateCafeOpen(true);
+      navigate("/customer/feedback");
     } else if (tabId === "home") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -192,7 +209,7 @@ export default function CustomerMainPage() {
         <CustomerHeader
           cartCount={cartCount}
           onOpenCart={() => setIsCartOpen(true)}
-          onOpenProfile={() => setIsRateCafeOpen(true)}
+          onOpenProfile={() => navigate("/customer/feedback")}
           onOpenMenu={() => setIsNavDrawerOpen(true)}
           onOpenNotifications={() => setIsNotificationsOpen(true)}
           onOpenLocationModal={() => {
@@ -208,7 +225,6 @@ export default function CustomerMainPage() {
             onOrderNow={() => navigate("/menu")}
             onOpenAiBot={() => navigate("/customer/chatbot")}
             onOpenWaiter={() => navigate("/customer/chatbot")}
-            onOpenOffers={() => document.getElementById("offers-anchor")?.scrollIntoView({ behavior: "smooth" })}
             onOpenOrders={() => navigate("/customer/orders")}
           />
 
@@ -222,9 +238,9 @@ export default function CustomerMainPage() {
             onSearchSubmit={() => navigate(`/menu?search=${encodeURIComponent(searchQuery)}`)}
           />
 
-          {/* 4. Category Cards (القهوة، المشروبات الباردة، الحلويات، الوجبات الخفيفة، المزيد) */}
+          {/* 4. Category Cards — real categories only */}
           <CategoryCards
-            categories={MAIN_PAGE_DATA.categories}
+            categories={realCategories.length ? realCategories : []}
             selectedCategory={selectedCategory}
             onSelectCategory={(id) => {
               setSelectedCategory(id);
@@ -241,23 +257,15 @@ export default function CustomerMainPage() {
           />
 
           <CustomerReviews
-            reviews={MAIN_PAGE_DATA.reviews.slice(0, 3)}
+            reviews={latestReviews.length ? latestReviews : []}
             onViewAllReviews={() => navigate("/customer/feedback")}
-            onAddReview={() => setIsRateCafeOpen(true)}
+            onAddReview={() => navigate("/customer/feedback")}
           />
 
-          {/* 6. Weekly Offer Banner (عرض الأسبوع - خصم 20% كود 404COLD) */}
-          <WeeklyOfferBanner
-            offerData={MAIN_PAGE_DATA.weeklyOffer}
-            onApplyOffer={handleApplyOffer}
-          />
-
-          {/* 8. Branch Info Card (فرع إيتاي البارود - البحيرة) */}
+          {/* 8. Branch Info Card */}
           <BranchInfoCard
-            branchData={MAIN_PAGE_DATA.branchInfo}
-            onOpenLocationDetails={() => {
-              showToast("العنوان: إيتاي البارود - البحيرة (شارع الجمهورية - أمام المحطة)");
-            }}
+            branchData={CAFE_BRANCH}
+            onOpenLocationDetails={() => window.open(CAFE_BRANCH.mapUrl, "_blank")}
           />
 
           {/* 9. Comprehensive Responsive Footer */}
@@ -352,15 +360,6 @@ export default function CustomerMainPage() {
           isOpen={isTrackOrdersOpen}
           onClose={() => setIsTrackOrdersOpen(false)}
           orders={MAIN_PAGE_DATA.sampleOrders}
-        />
-
-        <RateCafeModal
-          isOpen={isRateCafeOpen}
-          onClose={() => setIsRateCafeOpen(false)}
-          onSubmitRating={(rating) => {
-            setIsRateCafeOpen(false);
-            showToast("شكراً لك على تقييمك ودعمك لكافيه 404! ❤️");
-          }}
         />
       </div>
     </div>

@@ -4,6 +4,8 @@ import { useAuthStore } from "@/store/authStore";
 import { can } from "@/modules/auth/permissions/permission";
 import { isConflict } from "@/api/apiError";
 import { AsyncState, ConflictDialog, Money } from "@/shared/components";
+import { useDebounce } from "@/shared/hooks/useDebounce";
+import { useMaterialsScreen } from "@/modules/admin/inventory/hooks/inventory.queries";
 import { useProductsScreen, useProductDetails } from "../hooks/product.queries";
 import {
   useCreateProductAddon,
@@ -159,8 +161,42 @@ function BasicEditor({ product, categories, canManage, onReload }) {
   );
 }
 
+function TypeMaterialPicker({ selected, onChange, disabled }) {
+  const [search, setSearch] = useState("");
+  const debounced = useDebounce(search, 400);
+  const query = useMaterialsScreen({ page: 1, limit: 10, search: debounced || undefined });
+  const materials = query.data?.materials || [];
+  const toggle = (id) => {
+    const next = String(id);
+    onChange(selected.includes(next) ? selected.filter((item) => item !== next) : [...selected, next].slice(0, 100));
+  };
+  return (
+    <div style={{ display: "grid", gap: 6, gridColumn: "1 / -1" }}>
+      <input
+        placeholder="ابحث عن مادة خام للنوع وعلّم عليها"
+        aria-label="بحث عن مادة خام للنوع"
+        value={search}
+        disabled={disabled}
+        onChange={(event) => setSearch(event.target.value)}
+      />
+      <div style={{ display: "grid", gap: 4, maxHeight: 160, overflow: "auto" }}>
+        {materials.map((material) => (
+          <label key={material.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+            <input type="checkbox" checked={selected.includes(String(material.id))} disabled={disabled} onChange={() => toggle(material.id)} />
+            <span>{material.name}</span>
+          </label>
+        ))}
+        {!query.isLoading && materials.length === 0 && <small>لا توجد مواد مطابقة.</small>}
+        {query.isError && <small>تعذر تحميل المواد.</small>}
+      </div>
+      {selected.length > 0 && <small>المختار: {selected.length} مادة</small>}
+    </div>
+  );
+}
+
 function TypeAdder({ productId, canManage, onReload }) {
   const [name, setName] = useState("");
+  const [allowedMaterialIds, setAllowedMaterialIds] = useState([]);
   const [error, setError] = useState("");
   const mutation = useCreateProductType(productId);
   if (!canManage) return null;
@@ -168,16 +204,17 @@ function TypeAdder({ productId, canManage, onReload }) {
     event.preventDefault();
     mutation.resetAttempt();
     setError("");
-    const parsed = productTypeSchema.safeParse({ name: name.trim(), allowedMaterialIds: [], sortOrder: 0 });
+    const parsed = productTypeSchema.safeParse({ name: name.trim(), allowedMaterialIds: allowedMaterialIds.map(String), sortOrder: 0 });
     if (!parsed.success) {
       setError(firstProductFormError(parsed));
       return;
     }
-    mutation.mutate(parsed.data, { onSuccess: async () => { setName(""); await onReload?.(); } });
+    mutation.mutate(parsed.data, { onSuccess: async () => { setName(""); setAllowedMaterialIds([]); await onReload?.(); } });
   };
   return (
     <form className="details-inline" onSubmit={submit}>
       <input placeholder="اسم نوع جديد" aria-label="اسم نوع جديد" value={name} disabled={mutation.isPending} onChange={(event) => setName(event.target.value)} />
+      <TypeMaterialPicker selected={allowedMaterialIds} onChange={setAllowedMaterialIds} disabled={mutation.isPending} />
       <button type="submit" className="details-primary" disabled={mutation.isPending}>
         {mutation.isPending ? "جاري الحفظ..." : "إضافة نوع"}
       </button>

@@ -34,8 +34,9 @@ export function normalizeApiError(error) {
 }
 
 export const getArabicErrorMessage = (error) => normalizeApiError(error).message;
-export const isConflict = (error) => [409].includes(normalizeApiError(error).status) || ["VERSION_CONFLICT", "TRANSACTION_CONFLICT"].includes(normalizeApiError(error).code);
+export const isConflict = (error) => { const c = normalizeApiError(error).code || ""; return c.endsWith("_CONFLICT") || c === "VERSION_CONFLICT"; };
 export const isPermissionDenied = (error) => normalizeApiError(error).status === 403;
+export const isSessionExpired = (error) => normalizeApiError(error).status === 401;
 export const isDevicePending = (error) => normalizeApiError(error).code === "DEVICE_APPROVAL_REQUIRED";
 
 export function applyFieldErrors(setError, error) {

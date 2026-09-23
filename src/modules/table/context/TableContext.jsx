@@ -15,7 +15,6 @@ const TableContext = createContext(null);
 export function TableProvider({ children }) {
   const params = useParams();
   const navigate = useNavigate();
-  const qrSecret = new URLSearchParams(window.location.search).get("qrSecret") || "";
 
   // Active table number (from param or saved)
   const [tableNumber, setTableNumberState] = useState(() => {
@@ -58,9 +57,9 @@ export function TableProvider({ children }) {
     }
   }, [params.tableId]);
 
-  useEffect(() => { if (!params.tableId) return; const stored = tableSessionStorage.read(params.tableId); if (stored) { setGuestAccess(stored); return; } if (!qrSecret) { setAccessError("رابط الطاولة غير صالح أو انتهت جلسته. امسح رمز QR مرة أخرى."); return; } bootstrapV1TableGuest({ tableNumber: Number(params.tableId), qrSecret }).then((value) => { tableSessionStorage.save(params.tableId, value); setGuestAccess(value); setAccessError(""); const clean = `${window.location.pathname}`; window.history.replaceState({}, "", clean); }).catch((e) => setAccessError(e?.response?.data?.error?.messageAr || e.message)); }, [params.tableId, qrSecret]);
+  useEffect(() => { if (!params.tableId) return; const stored = tableSessionStorage.read(params.tableId); if (stored) { setGuestAccess(stored); return; } bootstrapV1TableGuest({ tableNumber: Number(params.tableId) }).then((value) => { tableSessionStorage.save(params.tableId, value); setGuestAccess(value); setAccessError(""); }).catch((e) => setAccessError(e?.response?.data?.error?.messageAr || e.message)); }, [params.tableId]);
 
-  // Load orders for current table
+  // Load orders for current table — real backend + local fallback
   const refreshTableData = useCallback(async () => {
     if (refreshInFlight.current) return refreshInFlight.current;
     const task = (async () => {
@@ -68,7 +67,26 @@ export function TableProvider({ children }) {
     setTableOrders(orders);
     const localActive = getActiveOrderByTableNumber(tableNumber);
     setActiveOrder(localActive);
-    if (tableToken) try { const result = await getV1CurrentProposal(tableToken); setCurrentProposal(result?.proposal || null); } catch { setCurrentProposal(null); }
+    if (tableToken) {
+      try { const result = await getV1CurrentProposal(tableToken); setCurrentProposal(result?.proposal || null); } catch { setCurrentProposal(null); }
+      // Try to load real active order for this table (automatic tableNumber)
+      try {
+        const { getActiveTableOrder } = await import("../services/tableGateway");
+        const real = await getActiveTableOrder(tableNumber, tableToken);
+        if (real && real.id) {
+          // Backend order has real status + tableNumber; use it as source of truth
+          setActiveOrder((prev) => {
+            const merged = { ...prev, ...real, tableNumber: real.tableNumber || tableNumber };
+            return merged;
+          });
+          setTableOrders((prev) => {
+            const exists = prev.some((o) => String(o.id) === String(real.id));
+            if (exists) return prev.map((o) => String(o.id) === String(real.id) ? { ...o, ...real } : o);
+            return [real, ...prev];
+          });
+        }
+      } catch {}
+    }
     })();
     refreshInFlight.current = task;
     try {

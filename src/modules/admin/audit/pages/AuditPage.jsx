@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { History } from "lucide-react";
 import PageHeader from "@/shared/components/PageHeader/PageHeader";
 import Button from "@/shared/components/Button/Button";
@@ -48,26 +48,74 @@ function JsonBlock({ title, value }) {
   );
 }
 
-function AuditEventRowDetails({ event }) {
+function AuditEventCardDetails({ event }) {
   const details = useAuditEvent(event.id);
   const full = details.data?.event || event;
+  const infoRows = [
+    ["رقم الحدث", full.eventNo || "—"],
+    ["الإجراء", full.action || "—"],
+    ["الوحدة", full.module || "—"],
+    ["نوع الكيان", full.entity?.type || "—"],
+    ["معرف الكيان", full.entity?.id ? String(full.entity.id) : "—"],
+    ["النتيجة", full.resultLabel || full.result || "—"],
+    ["الخطورة", full.severityLabel || full.severity || "—"],
+    ["requestId", full.requestId || "—"],
+  ];
   return (
-    <tr className="audit-row audit-row--expanded">
-      <td colSpan={8}>
-        {details.isLoading && <p className="audit-muted">جاري تحميل تفاصيل الحدث...</p>}
-        {details.isError && (
-          <p className="audit-error" role="alert">{details.error?.message || "تعذر تحميل التفاصيل"}</p>
-        )}
-        <div className="audit-event-meta">
-          <span>رقم الحدث: {full.eventNo || "—"}</span>
-          <span>الإجراء: {full.action || "—"}</span>
-          <span>الوقت: <DateTime value={full.occurredAt} /></span>
+    <div className="audit-event-full">
+      {details.isLoading && <p className="audit-muted">جاري تحميل تفاصيل الحدث...</p>}
+      {details.isError && (
+        <p className="audit-error" role="alert">{details.error?.message || "تعذر تحميل التفاصيل"}</p>
+      )}
+      <dl className="audit-event-grid">
+        {infoRows.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd dir={label === "requestId" || label === "معرف الكيان" ? "ltr" : undefined}>{String(value)}</dd>
+          </div>
+        ))}
+        <div>
+          <dt>الوقت</dt>
+          <dd><DateTime value={full.occurredAt} /></dd>
         </div>
-        <JsonBlock title="الفاعل (actor)" value={full.actor} />
-        <JsonBlock title="الكيان (entity)" value={full.entity} />
-        <JsonBlock title="الحدث كاملًا (JSON)" value={full} />
-      </td>
-    </tr>
+      </dl>
+      <JsonBlock title="بيانات إضافية (metadata)" value={full.metadataSafe ?? full.metadata} />
+    </div>
+  );
+}
+
+function AuditEventCard({ event, expanded, onToggle }) {
+  const initial = (event.actorName || event.actorLabel || "؟").trim().charAt(0) || "؟";
+  return (
+    <article className="audit-event-card" aria-label={`حدث ${event.eventNo || event.eventType}`}>
+      <div className="audit-event-card__top">
+        <span className="audit-event-card__no">#{event.eventNo || "—"}</span>
+        <strong className="audit-event-card__type">{event.eventLabel}</strong>
+        <span className="audit-event-card__module">{event.module || "—"}</span>
+        <span className={`audit-event-card__pill audit-event-card__pill--${String(event.result || "").toLowerCase()}`}>
+          {event.resultLabel}
+        </span>
+        <span className={`audit-event-card__pill audit-event-card__pill--${String(event.severity || "").toLowerCase()}`}>
+          {event.severityLabel}
+        </span>
+        <span className="audit-event-card__time"><DateTime value={event.occurredAt} /></span>
+      </div>
+      <div className="audit-event-card__actor">
+        <span className="audit-event-card__avatar" aria-hidden="true">{initial}</span>
+        <span className="audit-event-card__actor-name">{event.actorName || "غير متاح"}</span>
+        <span className="audit-event-card__actor-type">{event.actorLabel}</span>
+        <span className="audit-event-card__action">{event.action || "—"}</span>
+        <button
+          type="button"
+          className="audit-expand-btn audit-event-card__toggle"
+          aria-expanded={expanded}
+          onClick={onToggle}
+        >
+          {expanded ? "إخفاء البيانات" : "عرض البيانات الكاملة"}
+        </button>
+      </div>
+      {expanded && <AuditEventCardDetails event={event} />}
+    </article>
   );
 }
 
@@ -195,33 +243,15 @@ export default function AuditPage() {
           {items.length === 0 ? (
             <p className="audit-muted">لا توجد أحداث مطابقة للفلاتر الحالية.</p>
           ) : (
-            <div className="audit-table-wrap">
-              <table className="audit-table">
-                <thead>
-                  <tr><th>الرقم</th><th>النوع</th><th>الوحدة</th><th>الإجراء</th><th>النتيجة</th><th>الخطورة</th><th>الوقت</th><th>التفاصيل</th></tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <Fragment key={item.id}>
-                      <tr>
-                        <td>{item.eventNo || "—"}</td>
-                        <td>{item.eventType || "—"}</td>
-                        <td>{item.module || "—"}</td>
-                        <td>{item.action || "—"}</td>
-                        <td>{item.resultLabel}</td>
-                        <td>{item.severityLabel}</td>
-                        <td><DateTime value={item.occurredAt} /></td>
-                        <td>
-                          <button type="button" className="audit-expand-btn" aria-expanded={expandedId === item.id} onClick={() => setExpandedId((c) => (c === item.id ? null : item.id))}>
-                            {expandedId === item.id ? "إخفاء" : "عرض"}
-                          </button>
-                        </td>
-                      </tr>
-                      {expandedId === item.id && <AuditEventRowDetails event={item} />}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
+            <div className="audit-events">
+              {items.map((item) => (
+                <AuditEventCard
+                  key={item.id}
+                  event={item}
+                  expanded={expandedId === item.id}
+                  onToggle={() => setExpandedId((c) => (c === item.id ? null : item.id))}
+                />
+              ))}
             </div>
           )}
           <ServerPagination meta={screen.data?.pageMeta} onPageChange={setPage} disabled={screen.isFetching} label="حدث" />

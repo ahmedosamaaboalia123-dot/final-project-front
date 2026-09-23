@@ -199,10 +199,9 @@ const v1GuestHeaders = (tableToken, idempotencyKey) => ({
   },
 });
 
-export async function bootstrapV1TableGuest({ tableNumber, qrSecret }) {
+export async function bootstrapV1TableGuest({ tableNumber }) {
   const payload = await apiClient.post(endpoints.v1.tableGuest.bootstrap, {
     tableNumber: Number(tableNumber),
-    qrSecret,
   });
   return unwrap(payload);
 }

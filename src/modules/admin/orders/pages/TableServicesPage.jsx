@@ -16,8 +16,11 @@ export default function TableServicesPage() {
     {loading && <p>جاري تحميل طلبات الخدمات...</p>}
     <div className="prep-tabs"><button className={tab === "open" ? "prep-tab active" : "prep-tab"} onClick={() => { setTab("open"); setPage(1); }}>الطلبات الحالية</button><button className={tab === "completed" ? "prep-tab active" : "prep-tab"} onClick={() => { setTab("completed"); setPage(1); }}>الطلبات المنتهية</button></div>
     <div className="table-services-content">
-      <TableServiceRequestsList title="الطلبات النشطة" services={active} pendingId={pendingId} onStatusChange={changeStatus}/>
-      <TableServiceRequestsList title="الطلبات المنتهية" services={done} finished pendingId={pendingId} onStatusChange={changeStatus}/>
+      {tab === "open" ? (
+        <TableServiceRequestsList title="الطلبات النشطة" services={active} pendingId={pendingId} onStatusChange={changeStatus} />
+      ) : (
+        <TableServiceRequestsList title="الطلبات المنتهية" services={done} finished pendingId={pendingId} onStatusChange={changeStatus} />
+      )}
     </div>
     <ServerPagination meta={meta} onPageChange={setPage} disabled={loading} label="خدمة"/>
   </div>;

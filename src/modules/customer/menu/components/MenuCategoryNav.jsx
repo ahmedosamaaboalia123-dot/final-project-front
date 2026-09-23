@@ -3,7 +3,7 @@ import { Coffee, CupSoda, Flame, CakeSlice, Sandwich, Sparkles } from "lucide-re
 
 export default function MenuCategoryNav({
   categories = [],
-  activeCategory = "coffee",
+  activeCategory = "all",
   onSelectCategory,
 }) {
   const getCategoryIcon = (iconName) => {
@@ -18,6 +18,8 @@ export default function MenuCategoryNav({
         return <CakeSlice size={20} className="cat-icon" />;
       case "Sandwich":
         return <Sandwich size={20} className="cat-icon" />;
+      case "Sparkles":
+        return <Sparkles size={20} className="cat-icon" />;
       default:
         return <Coffee size={20} className="cat-icon" />;
     }

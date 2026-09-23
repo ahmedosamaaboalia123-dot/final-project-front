@@ -23,6 +23,7 @@
 }
 
 .prep-tab {
+  min-height: 44px;
   padding: var(--space-xs) var(--space-md);
   border: none;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
@@ -54,14 +55,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  min-width: 0;
 }
 
 .prep-col-title {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   font-weight: var(--fw-bold);
   color: var(--text-main);
-  padding-bottom: 4px;
-  border-bottom: 2px solid var(--border-light);
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--primary);
 }
 
 /* ── Table ── */
@@ -69,11 +71,13 @@
   background: var(--card-bg);
   border: var(--card-border);
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .prep-table {
   width: 100%;
+  min-width: 480px;
   border-collapse: collapse;
 }
 
@@ -82,17 +86,17 @@
 }
 
 .prep-table th {
-  padding: var(--space-xs) var(--space-sm);
+  padding: var(--space-sm);
   text-align: right;
-  font-size: 10px;
-  font-weight: var(--fw-semibold);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
   color: var(--text-main);
   border-bottom: 1px solid var(--border-main);
 }
 
 .prep-table td {
-  padding: var(--space-xs) var(--space-sm);
-  font-size: 12px;
+  padding: var(--space-sm);
+  font-size: var(--fs-sm);
   color: var(--text-main);
   border-bottom: 1px solid var(--border-light);
   vertical-align: middle;
@@ -112,6 +116,7 @@
   font-weight: var(--fw-bold);
   color: var(--primary);
   white-space: nowrap;
+  font-size: var(--fs-sm);
 }
 
 .prep-order-source {
@@ -119,9 +124,9 @@
 }
 
 .prep-status {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: 8px;
   background: var(--surface-soft);
   color: var(--text-secondary);
@@ -153,14 +158,15 @@
 .btn-open,
 .btn-begin,
 .btn-deliver {
-  font-size: 10px;
-  font-weight: var(--fw-semibold);
-  padding: 4px 10px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  padding: 8px 18px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-family: var(--font-family);
   transition: var(--transition);
-  min-height: 30px;
+  min-height: 44px;
+  white-space: nowrap;
 }
 
 .btn-open {
@@ -220,6 +226,26 @@
   }
 
   .prep-table {
-    min-width: 420px;
+    min-width: 460px;
+  }
+
+  .prep-table th {
+    font-size: var(--fs-xs);
+  }
+
+  .prep-table td {
+    font-size: var(--fs-sm);
+  }
+
+  .btn-open,
+  .btn-deliver {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .prep-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
   }
 }

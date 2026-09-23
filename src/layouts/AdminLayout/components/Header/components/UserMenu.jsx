@@ -1,5 +1,6 @@
 import {useAuthStore} from "@/store/authStore";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { appConfig } from "@/app/config";
 import { authService } from "@/modules/auth/services/authService";
 import { disconnectAdminSocket } from "@/services/realtime";
@@ -15,22 +16,36 @@ LogOut
 function UserMenu(){
 
 const navigate = useNavigate();
+const queryClient = useQueryClient();
 const clearAuth = useAuthStore(state => state.clearAuth);
+const setAuth = useAuthStore(state => state.setAuth);
 const currentAttendance = useAuthStore(state => state.currentAttendance);
-const checkOut = useCheckOut();
+const checkOut = useCheckOut({
+  onSuccess: (data) => {
+    // حدّث الحضور الحالي في المتجر وأبطل الكاش
+    const updated = data?.checkOutAt ? null : currentAttendance;
+    // authStore يحمل currentAttendance من bootstrap/login — نصفره
+    const state = useAuthStore.getState();
+    if (state.currentAttendance) setAuth({ ...state, currentAttendance: null });
+    queryClient.invalidateQueries({ queryKey: ["attendance"] });
+    queryClient.invalidateQueries({ queryKey: ["employees"] });
+  }
+});
 const checkOutTime = checkOut.data?.checkOutAt
     ? new Date(checkOut.data.checkOutAt).toLocaleTimeString("ar-EG", {
         hour: "2-digit",
         minute: "2-digit",
     })
     : null;
+const hasOpenAttendance = Boolean(currentAttendance) && String(currentAttendance.status || "OPEN").toUpperCase() !== "CLOSED";
 
 const registerCheckOut = () => {
     if (checkOut.isPending) return;
     const attendanceId = currentAttendance?.id;
+    const expectedVersion = Number(currentAttendance?.version ?? 0);
     if (!attendanceId) { window.alert("لا يوجد حضور مفتوح لتسجيل الانصراف"); return; }
     if (!window.confirm("هل تريد تسجيل الانصراف الآن؟")) return;
-    checkOut.mutate(String(attendanceId));
+    checkOut.mutate({ attendanceId: String(attendanceId), expectedVersion });
 };
 
 const logout = async () => {
@@ -77,10 +92,12 @@ return (
 
 
 <div className="user-menu__actions">
+    {hasOpenAttendance && (
     <button type="button" className="user-menu__checkout" onClick={registerCheckOut} disabled={checkOut.isPending} aria-label="تسجيل الانصراف" title="تسجيل الانصراف">
         <Clock3 size={15}/>
         <span>{checkOut.isPending ? "جاري التسجيل..." : "تسجيل الانصراف"}</span>
     </button>
+    )}
     <button type="button" className="user-menu__logout" onClick={logout} aria-label="تسجيل الخروج" title="تسجيل الخروج">
         <LogOut size={15}/>
         <span>تسجيل الخروج</span>

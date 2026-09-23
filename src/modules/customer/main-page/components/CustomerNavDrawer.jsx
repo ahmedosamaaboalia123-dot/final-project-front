@@ -6,7 +6,6 @@ import {
   Truck,
   Bot,
   Star,
-  Tag,
 } from "lucide-react";
 
 export default function CustomerNavDrawer({
@@ -21,7 +20,6 @@ export default function CustomerNavDrawer({
     { id: "menu", label: "قائمة المينيو", icon: Coffee },
     { id: "orders", label: "طلباتي وفواتيري", icon: Truck },
     { id: "chatbot", label: "باريستا 404 الذكي", icon: Bot },
-    { id: "offers", label: "العروض المميزة", icon: Tag },
     { id: "rate", label: "تقييم الكافيه", icon: Star },
   ];
 

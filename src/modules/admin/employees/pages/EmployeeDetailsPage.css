@@ -26,6 +26,46 @@
   font-weight: 700;
 }
 
+.device-actions--compact {
+  flex-wrap: nowrap;
+}
+
+.device-decision {
+  border: 1px solid #cfe2ff;
+  border-radius: 8px;
+  min-height: 44px;
+  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  background: #eef6ff;
+  color: #1a5fb4;
+  white-space: nowrap;
+}
+
+.device-decision:hover:not(:disabled) {
+  background: #ddeaff;
+}
+
+.device-decision:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.device-decision--danger {
+  border-color: #f3c1c1;
+  background: #fdecec;
+  color: #b3261e;
+}
+
+.device-decision--danger:hover:not(:disabled) {
+  background: #fbdcdc;
+}
+
 .employee-details-state {
   margin: 50px;
   text-align: center;

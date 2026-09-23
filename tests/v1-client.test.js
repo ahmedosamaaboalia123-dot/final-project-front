@@ -36,6 +36,31 @@ describe("v1 client", () => {
     expect(config.headers["X-Request-Id"]).toBeTruthy();
   });
 
+  it("wipes stored tokens only when the refresh itself fails with 401", async () => {
+    const fake = fakeAxios();
+    fake.module.post = vi.fn(() => Promise.reject({ response: { status: 401, data: {} } }));
+    const cleared = vi.fn();
+    const storage = memoryStorage({ access_token: "old-access", refresh_token: "old-refresh" });
+    createV1Client({ baseURL: "/api/v1", storage, authStore: { getState: () => ({ clearAuth: cleared }) }, axiosModule: fake.module });
+    await expect(fake.handlers.failure({ response: { status: 401, data: {} }, config: { url: "/admin/bootstrap", headers: {} } })).rejects.toBeTruthy();
+    expect(storage.getItem("access_token")).toBeNull();
+    expect(storage.getItem("refresh_token")).toBeNull();
+    expect(cleared).toHaveBeenCalled();
+  });
+
+  it("keeps stored tokens on transient failures", async () => {
+    const fake = fakeAxios();
+    const cleared = vi.fn();
+    const storage = memoryStorage({ access_token: "old-access", refresh_token: "old-refresh" });
+    createV1Client({ baseURL: "/api/v1", storage, authStore: { getState: () => ({ clearAuth: cleared }) }, axiosModule: fake.module });
+    await expect(fake.handlers.failure({ response: { status: 500, data: {} }, config: { url: "/admin/bootstrap", headers: {} } })).rejects.toBeTruthy();
+    await expect(fake.handlers.failure(new Error("offline"))).rejects.toBeTruthy();
+    expect(storage.getItem("access_token")).toBe("old-access");
+    expect(storage.getItem("refresh_token")).toBe("old-refresh");
+    expect(cleared).not.toHaveBeenCalled();
+    expect(fake.module.post).not.toHaveBeenCalled();
+  });
+
   it("shares one refresh request and stores camelCase tokens", async () => {
     const fake = fakeAxios({ data: { ok: true, data: { accessToken: "new-access", refreshToken: "new-refresh" }, meta: {} } });
     const storage = memoryStorage({ refresh_token: "old-refresh" });

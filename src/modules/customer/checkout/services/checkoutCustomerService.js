@@ -4,7 +4,7 @@
 
 const PROFILE_KEY = "404_customer_profile_v1";
 
-const EMPTY_PROFILE = { name: "", phone: "", lastOrder: { orderNumber: "", trackingToken: "", phone: "", fulfillmentType: "", total: null, createdAt: "" } };
+const EMPTY_PROFILE = { name: "", phone: "", lastOrder: { orderNumber: "", trackingToken: "", phone: "", fulfillmentType: "", total: null, createdAt: "", status: "", version: 0, id: "", publicOrderNumber: "" } };
 
 export function getCustomerProfile() {
   try {
@@ -21,6 +21,10 @@ export function getCustomerProfile() {
         fulfillmentType: typeof parsed?.lastOrder?.fulfillmentType === "string" ? parsed.lastOrder.fulfillmentType : "",
         total: typeof parsed?.lastOrder?.total === "number" ? parsed.lastOrder.total : null,
         createdAt: typeof parsed?.lastOrder?.createdAt === "string" ? parsed.lastOrder.createdAt : "",
+        status: typeof parsed?.lastOrder?.status === "string" ? parsed.lastOrder.status : "",
+        version: Number(parsed?.lastOrder?.version ?? 0) || 0,
+        id: typeof parsed?.lastOrder?.id === "string" ? parsed.lastOrder.id : "",
+        publicOrderNumber: typeof parsed?.lastOrder?.publicOrderNumber === "string" ? parsed.lastOrder.publicOrderNumber : "",
       },
     };
   } catch (e) {
@@ -49,6 +53,16 @@ export function saveCustomerProfile(partial = {}) {
   }
 }
 
-export function setLastOrder({ orderNumber = "", trackingToken = "", phone = "", fulfillmentType = "", total = null, createdAt = "" } = {}) {
-  return saveCustomerProfile({ lastOrder: { orderNumber, trackingToken, phone, fulfillmentType, total, createdAt } });
+export function setLastOrder({ orderNumber = "", trackingToken = "", phone = "", fulfillmentType = "", total = null, createdAt = "", status = "", version = 0, id = "", publicOrderNumber = "" } = {}) {
+  return saveCustomerProfile({ lastOrder: { orderNumber, trackingToken, phone, fulfillmentType, total, createdAt, status, version: Number(version) || 0, id, publicOrderNumber } });
+}
+
+export function updateLastOrder(patch = {}) {
+  try {
+    const current = getCustomerProfile();
+    return saveCustomerProfile({ lastOrder: { ...current.lastOrder, ...patch } });
+  } catch (e) {
+    console.error("updateLastOrder error:", e);
+    return getCustomerProfile();
+  }
 }

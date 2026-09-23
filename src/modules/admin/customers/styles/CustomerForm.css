@@ -22,7 +22,7 @@
 }
 
 .form-group input {
-    height: 36px;
+    height: 40px;
     padding: 0 12px;
     border: 1px solid var(--input-border);
     border-radius: var(--input-radius);
@@ -32,6 +32,24 @@
     color: var(--text-main);
     outline: none;
     transition: var(--transition);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    min-height: 76px;
+    padding: 10px 12px;
+    border: 1px solid var(--input-border);
+    border-radius: var(--input-radius);
+    background: var(--input-bg);
+    font-size: var(--fs-xs);
+    font-family: var(--font-family);
+    color: var(--text-main);
+    outline: none;
+    transition: var(--transition);
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
 }
 
 .form-group input:focus {
@@ -66,7 +84,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-sm);
-    height: 38px;
+    height: 40px;
     padding: 0 var(--button-padding-x);
     border: none;
     border-radius: var(--button-radius);
@@ -139,7 +157,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-sm);
-    height: 38px;
+    height: 40px;
     padding: 0 var(--button-padding-x);
     border: 1px solid var(--border-main);
     border-radius: var(--button-radius);
@@ -175,7 +193,18 @@
         height: 44px;
     }
 
+    .form-actions-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .btn-submit {
         height: 44px;
+        width: 100%;
+    }
+
+    .btn-cancel {
+        height: 44px;
+        width: 100%;
     }
 }

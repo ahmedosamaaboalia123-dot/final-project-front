@@ -14,6 +14,7 @@ export const DELIVERY_ENDPOINTS = Object.freeze({
   failed: (id) => `/delivery-assignments/${encodeURIComponent(id)}/failed`,
   returned: (id) => `/delivery-assignments/${encodeURIComponent(id)}/returned`,
   confirm: (id) => `/delivery-assignments/${encodeURIComponent(id)}/admin-confirm-delivery`,
+  deliver: (id) => `/delivery-assignments/${encodeURIComponent(id)}/deliver-to-customer`,
   settle: (id) => `/delivery-assignments/${encodeURIComponent(id)}/settle-cash`,
   recordWhatsapp: (id) => `/delivery-assignments/${encodeURIComponent(id)}/whatsapp-share-opened`,
 });
@@ -31,6 +32,7 @@ export const deliveryApi = {
   failed: (id, body, key) => post(DELIVERY_ENDPOINTS.failed(id), body, key),
   returned: (id, body, key) => post(DELIVERY_ENDPOINTS.returned(id), body, key),
   confirm: (id, body, key) => post(DELIVERY_ENDPOINTS.confirm(id), body, key),
+  deliver: (id, body, key) => post(DELIVERY_ENDPOINTS.deliver(id), body, key),
   settle: (id, body, key) => post(DELIVERY_ENDPOINTS.settle(id), body, key),
   recordWhatsapp: (id, body, key) => post(DELIVERY_ENDPOINTS.recordWhatsapp(id), body, key),
 };

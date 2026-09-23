@@ -3,9 +3,14 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 test("the pinned backend route manifest is valid and contains the expected contract", async () => {
-  const manifestPath = path.join(process.cwd(), "src", "api", "route-manifest.snapshot.json");
+  const manifestPath = path.join(
+    process.cwd(),
+    "src",
+    "api",
+    "route-manifest.snapshot.json",
+  );
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  expect(manifest).toHaveLength(196);
+  expect(manifest).toHaveLength(197);
   const keys = new Set(manifest.map(({ method, path }) => `${method} ${path}`));
   expect(keys.size).toBe(manifest.length);
   for (const expected of [
@@ -17,5 +22,8 @@ test("the pinned backend route manifest is valid and contains the expected contr
     "GET /api/v1/preparation-screen",
     "GET /api/v1/financial-reports-screen",
     "GET /api/v1/audit-events-screen",
-  ]) expect(keys.has(expected), `Missing required route: ${expected}`).toBe(true);
+  ])
+    expect(keys.has(expected), `Missing required route: ${expected}`).toBe(
+      true,
+    );
 });

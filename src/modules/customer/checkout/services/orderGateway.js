@@ -2,24 +2,66 @@ import apiClient from "@/services/apiClient";
 import { endpoints } from "@/services/endpoints";
 import { customerOrdersApi } from "@/modules/customer/api/customerOrders.api";
 import { customerStorage } from "@/modules/customer/services/customerStorage";
+import { getV1Menu } from "@/services/catalogService";
 
 export const ORDER_FULFILLMENT = { ONLINE_DELIVERY: "DELIVERY", TAKEAWAY_PICKUP: "TAKEAWAY" };
 const makeIdempotencyKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-const normalizeItem = (item) => ({
-  productId: String(item.originalId || item.productId || item.id),
-  productSizeId: String(item.productSizeId || item.customizations?.sizeId),
-  typeName: item.customizations?.type || item.type,
-  addonIds: (item.customizations?.addons || item.addons || []).map((addon) => String(addon.id || addon.productAddonId || addon)),
-  quantity: Number(item.quantity) || 1,
-});
+const OBJECT_ID = /^[a-f\d]{24}$/i;
+
+/**
+ * يحول أصناف السلة (بأشكالها المختلفة) إلى body صالح لعقد الباك الصارم.
+ * - يحل المقاس الناقص من أول مقاس في الكتالوج.
+ * - يفلتر الإضافات غير الصالحة.
+ * - يرمي خطأ عربيًا يسمي المنتج عند تعذر الحل (بدل 400 عام من الباك).
+ */
+export async function resolveOrderItems(items = []) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) throw new Error("السلة فارغة");
+  let menu = null;
+  const out = [];
+  for (const item of list) {
+    const name = item?.name || "المنتج";
+    const productId = String(item?.originalId || item?.productId || item?.id || "");
+    if (!OBJECT_ID.test(productId)) throw new Error(`بيانات غير صالحة للمنتج: ${name}`);
+    let sizeId = String(item?.productSizeId || item?.customizations?.sizeId || "");
+    if (!OBJECT_ID.test(sizeId)) {
+      if (!menu) {
+        try {
+          menu = await getV1Menu();
+        } catch {
+          menu = { items: [] };
+        }
+      }
+      if (!menu?.fromBackend) throw new Error("تعذر تحميل المنيو، حاول مجددًا");
+      const product = (menu.items || []).find((p) => String(p?.id) === productId);
+      if (!product) throw new Error(`اختر المقاس لمنتج: ${name}`);
+      const fallback = product?.sizes?.[0];
+      sizeId = String(fallback?.id || fallback?.productSizeId || "");
+      if (!OBJECT_ID.test(sizeId)) throw new Error(`منتج "${name}" بدون مقاس مسجل — تواصل مع إدارة الكافيه`);
+    }
+    const addonIds = (item?.customizations?.addons || item?.addons || [])
+      .map((addon) => String(addon?.id || addon?.productAddonId || addon))
+      .filter((value) => OBJECT_ID.test(value));
+    const quantity = Math.max(1, Math.min(100, Number(item?.quantity) || 1));
+    const notes = String(item?.customizations?.notes || item?.notes || "").trim().slice(0, 500);
+    out.push({
+      productId,
+      productSizeId: sizeId,
+      quantity,
+      ...(addonIds.length ? { addonIds } : {}),
+      ...(notes ? { notes } : {}),
+    });
+  }
+  return out;
+}
 
 export function buildPublicOrderPayload({ fulfillmentType, customer, items }) {
   const deliveryAddress = fulfillmentType === "DELIVERY" ? {
     city: customer.city?.trim(), area: customer.area?.trim(), street: customer.street?.trim(),
     building: customer.building?.trim(), floor: customer.floor?.trim(), landmark: customer.landmark?.trim(),
   } : null;
-  return { channel: "CUSTOMER_WEB", fulfillmentType, customer: { name: customer.name.trim(), phone: customer.phone.trim() }, deliveryAddress, items: items.map(normalizeItem) };
+  return { channel: "CUSTOMER_WEB", fulfillmentType, customer: { name: customer.name.trim(), phone: customer.phone.trim() }, deliveryAddress, items: (items || []).map((item) => ({ productId: String(item.originalId || item.productId || item.id), productSizeId: String(item.productSizeId || item.customizations?.sizeId), quantity: Number(item.quantity) || 1 })) };
 }
 
 export async function createPublicOrder(input, idempotencyKey = makeIdempotencyKey()) {

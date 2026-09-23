@@ -9,13 +9,15 @@
     display: flex;
     align-items: center;
     gap: var(--space-lg);
+    flex-wrap: wrap;
 }
 
 .btn-back {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
+    min-height: 44px;
+    padding: 0 var(--space-md);
     border: 1px solid var(--border-main);
     border-radius: var(--radius-md);
     background: var(--card-bg);
@@ -51,6 +53,17 @@
     font-weight: var(--fw-semibold);
 }
 
+.card-delegate {
+    padding: var(--space-xs) var(--space-md);
+    background: var(--info-bg);
+    color: var(--info);
+    border: 1px solid var(--info);
+    border-radius: 20px;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-semibold);
+    white-space: nowrap;
+}
+
 .card-badge-outside {
     padding: var(--space-xs) var(--space-md);
     background: #e0555a;
@@ -65,9 +78,11 @@
     gap: var(--space-sm);
     border-bottom: 2px solid var(--border-light);
     padding-bottom: var(--space-sm);
+    overflow-x: auto;
 }
 
 .tab-btn {
+    min-height: 44px;
     padding: var(--space-sm) var(--space-lg);
     border: none;
     border-radius: var(--radius-md) var(--radius-md) 0 0;
@@ -78,6 +93,7 @@
     cursor: pointer;
     transition: var(--transition);
     font-family: var(--font-family);
+    white-space: nowrap;
 }
 
 .tab-btn.active {
@@ -349,7 +365,8 @@
 }
 
 .btn-finish {
-    padding: var(--space-md) var(--space-2xl);
+    min-height: 44px;
+    padding: var(--space-sm) var(--space-2xl);
     border: none;
     border-radius: var(--button-radius);
     background: var(--button-primary-bg);
@@ -366,7 +383,8 @@
 }
 
 .btn-cancel-order {
-    padding: var(--space-md) var(--space-lg);
+    min-height: 44px;
+    padding: var(--space-sm) var(--space-lg);
     border: 1px solid var(--danger);
     border-radius: var(--button-radius);
     background: #fff;
@@ -404,3 +422,9 @@
     }
 }
 .delegate-dialog{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:16px;z-index:1000}.delegate-dialog__content{width:min(440px,100%);max-height:80vh;overflow:auto;background:#fff;border-radius:16px;padding:20px;display:grid;gap:10px}.delegate-dialog__content button{min-height:44px;border:1px solid #d8c7b4;border-radius:10px;background:#fff;padding:10px;cursor:pointer}
+.busy-card-page .confirm-trigger{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:var(--button-radius);border:1px solid var(--border-main);background:var(--card-bg);color:var(--text-main);font-size:var(--fs-sm);font-weight:var(--fw-semibold);cursor:pointer;font-family:var(--font-family);white-space:nowrap}
+.busy-card-page .confirm-trigger--danger{border-color:var(--danger);color:var(--danger);background:#fff}
+.busy-card-page .confirm-trigger--danger:hover:not(:disabled){background:var(--danger);color:#fff}
+.busy-card-page .confirm-trigger:disabled{opacity:.55;cursor:not-allowed}
+.busy-card-page p[role="alert"]{margin:0;color:var(--danger);font-size:var(--fs-xs);font-weight:var(--fw-semibold)}
+.card-title-box,.order-card-header,.order-item-bottom{flex-wrap:wrap;min-width:0}

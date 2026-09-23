@@ -30,8 +30,17 @@ export const ATTENDANCE_ENDPOINTS = Object.freeze({
 export const employeesApi = {
   async screen(params = {}) { return unwrapData(await v1Client.get(EMPLOYEE_ENDPOINTS.screen, { params: normalizePageParams(params) })); },
   async create(body, idempotencyKey) { return unwrapData(await v1Client.post(EMPLOYEE_ENDPOINTS.create, body, { headers: operationHeaders({ idempotencyKey }) })); },
-  async details(id, include = []) { return unwrapData(await v1Client.get(EMPLOYEE_ENDPOINTS.details(id), { params: include.length ? { include: include.join(",") } : {} })); },
+  async details(id, include = [], query = {}) {
+    const params = {};
+    if (include.length) params.include = include.join(",");
+    if (query.activityPage) params.activityPage = query.activityPage;
+    if (query.activityLimit) params.activityLimit = query.activityLimit;
+    if (query.attendancePage) params.attendancePage = query.attendancePage;
+    if (query.attendanceLimit) params.attendanceLimit = query.attendanceLimit;
+    return unwrapData(await v1Client.get(EMPLOYEE_ENDPOINTS.details(id), { params }));
+  },
   async update(id, body, idempotencyKey) { return unwrapData(await v1Client.patch(EMPLOYEE_ENDPOINTS.details(id), body, { headers: operationHeaders({ idempotencyKey }) })); },
+  async remove(id, body, idempotencyKey) { return unwrapData(await v1Client.delete(EMPLOYEE_ENDPOINTS.details(id), { data: body, headers: operationHeaders({ idempotencyKey }) })); },
   async devices(params = {}) { return unwrapData(await v1Client.get(EMPLOYEE_ENDPOINTS.devices, { params: normalizePageParams(params) })); },
   async approveDevice(id, body, idempotencyKey) { return unwrapData(await v1Client.post(EMPLOYEE_ENDPOINTS.approveDevice(id), body, { headers: operationHeaders({ idempotencyKey }) })); },
   async blockDevice(id, body, idempotencyKey) { return unwrapData(await v1Client.post(EMPLOYEE_ENDPOINTS.blockDevice(id), body, { headers: operationHeaders({ idempotencyKey }) })); },

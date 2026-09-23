@@ -31,6 +31,12 @@ export const useCreateEmployee = (options) =>
 export const useUpdateEmployee = (employeeId, options) =>
   useEmployeeMutation("employee:update", (body, key) => employeesApi.update(employeeId, body, key), { employeeId, ...options });
 
+export const useDeleteEmployee = (options) =>
+  useEmployeeMutation("employee:delete", (body, key) => {
+    const { employeeId, ...payload } = body;
+    return employeesApi.remove(employeeId, payload, key);
+  }, options);
+
 export const useApproveDevice = (options) =>
   useEmployeeMutation("device:approve", (body, key) => {
     const { deviceId, ...payload } = body;

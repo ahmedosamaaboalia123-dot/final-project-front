@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowRight, KeyRound, Laptop, ShieldCheck } from "lucide-react";
+import { ArrowRight, KeyRound, Laptop, Pencil, ShieldCheck, Trash2 } from "lucide-react";
 import PageHeader from "@/shared/components/PageHeader/PageHeader";
 import Button from "@/shared/components/Button/Button";
 import Input from "@/shared/components/Input/Input";
 import Select from "@/shared/components/Select/Select";
-import { AsyncState, ConfirmAction, ConflictDialog } from "@/shared/components";
+import { AsyncState, ConfirmAction, ConflictDialog, ServerPagination } from "@/shared/components";
 import { isConflict } from "@/api/apiError";
 import { useAuthStore } from "@/store/authStore";
 import { can } from "@/modules/auth/permissions/permission";
-import { useEmployeeDetails, usePermissionsCatalog, useRoles } from "../hooks/employee.queries";
-import { useApproveDevice, useBlockDevice, useReplacePermissionMatrix, useUpdateEmployee } from "../hooks/employee.mutations";
+import { adminNavigation } from "@/modules/auth/permissions/adminNavigation";
+import { useEmployeeDetails, useEmployeeDevices, usePermissionsCatalog, useRoles } from "../hooks/employee.queries";
+import { useApproveDevice, useBlockDevice, useRevokeDevice, useReplacePermissionMatrix, useUpdateEmployee, useDeleteEmployee } from "../hooks/employee.mutations";
 import { toRoleOptions } from "../adapters/employee.adapter";
 import {
   deviceDecisionSchema,
@@ -18,7 +19,6 @@ import {
   permissionMatrixSchema,
   updateEmployeeSchema,
 } from "../schemas/employee.schema";
-import AttendanceActions from "../components/AttendanceActions";
 import "./EmployeeDetailsPage.css";
 
 const formatDate = (value) => {
@@ -33,6 +33,12 @@ const formatDateTime = (value) => {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("ar-EG");
 };
 
+const formatTime = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+};
+
 const asItems = (value) => {
   if (Array.isArray(value)) return value;
   if (Array.isArray(value?.items)) return value.items;
@@ -40,21 +46,20 @@ const asItems = (value) => {
 };
 
 function EmployeeDeviceRow({ device, canDecide }) {
-  const [reason, setReason] = useState("");
   const [formError, setFormError] = useState("");
   const approve = useApproveDevice();
   const block = useBlockDevice();
-  const pending = approve.isPending || block.isPending;
-  const conflicted = (approve.isError && isConflict(approve.error)) || (block.isError && isConflict(block.error));
+  const revoke = useRevokeDevice();
+  const pending = approve.isPending || block.isPending || revoke.isPending;
+  const conflicted = (approve.isError && isConflict(approve.error)) || (block.isError && isConflict(block.error)) || (revoke.isError && isConflict(revoke.error));
   const reset = () => {
     approve.resetAttempt();
     block.resetAttempt();
+    revoke.resetAttempt();
   };
 
-  const payload = () => {
-    const trimmed = reason.trim();
+  const basePayload = () => {
     const parsed = deviceDecisionSchema.safeParse({
-      ...(trimmed ? { reason: trimmed } : {}),
       expectedVersion: Number(device.version ?? 0),
     });
     if (!parsed.success) {
@@ -65,11 +70,23 @@ function EmployeeDeviceRow({ device, canDecide }) {
     return parsed.data;
   };
 
-  const run = (mutation) => {
-    const body = payload();
+  const runApprove = () => {
+    const body = basePayload();
     if (!body) return;
     reset();
-    mutation.mutate({ deviceId: String(device.id), ...body });
+    approve.mutate({ deviceId: String(device.id), ...body });
+  };
+  const runBlock = () => {
+    const body = basePayload();
+    if (!body) return;
+    reset();
+    block.mutate({ deviceId: String(device.id), ...body, reason: "قرار إداري" });
+  };
+  const runRevoke = () => {
+    const body = basePayload();
+    if (!body) return;
+    reset();
+    revoke.mutate({ deviceId: String(device.id), ...body, reason: "قرار إداري" });
   };
 
   return (
@@ -77,27 +94,35 @@ function EmployeeDeviceRow({ device, canDecide }) {
       <td>{device.name || "جهاز غير مسمى"}</td>
       <td>{device.browser || "—"}</td>
       <td>{device.os || "—"}</td>
+      <td>{device.attemptCount ?? "—"}</td>
       <td>
         <span className={`device-status device-status--${String(device.status || "PENDING").toLowerCase()}`}>{device.statusLabel || device.status}</span>
       </td>
       <td>{formatDateTime(device.lastSeenAt || device.lastLoginAt || device.firstSeenAt)}</td>
       <td>
         {canDecide ? (
-          <div className="device-actions">
-            <input aria-label="سبب قرار الجهاز" placeholder="السبب (اختياري)" value={reason} disabled={pending} onChange={(event) => { setReason(event.target.value); setFormError(""); }} />
-            <Button variant="secondary" disabled={pending} loading={approve.isPending} onClick={() => run(approve)}>
-              اعتماد
-            </Button>
-            <Button variant="secondary" disabled={pending} loading={block.isPending} onClick={() => run(block)}>
-              حظر
-            </Button>
+          <div className="device-actions device-actions--compact">
+            {String(device.status) !== "APPROVED" ? (
+              <button type="button" className="device-decision" disabled={pending} onClick={runApprove}>
+                اعتماد
+              </button>
+            ) : (
+              <button type="button" className="device-decision" disabled={pending} onClick={runRevoke}>
+                إلغاء الاعتماد
+              </button>
+            )}
+            {String(device.status) !== "BLOCKED" && (
+              <button type="button" className="device-decision device-decision--danger" disabled={pending} onClick={runBlock}>
+                حظر
+              </button>
+            )}
           </div>
         ) : (
           <span>—</span>
         )}
-        {(formError || approve.isError || block.isError) && !conflicted && (
+        {(formError || approve.isError || block.isError || revoke.isError) && !conflicted && (
           <small className="row-error" role="alert">
-            {formError || approve.error?.message || block.error?.message}
+            {formError || approve.error?.message || block.error?.message || revoke.error?.message}
           </small>
         )}
         <ConflictDialog open={conflicted} onClose={reset} onReload={reset} pending={false} />
@@ -107,7 +132,7 @@ function EmployeeDeviceRow({ device, canDecide }) {
 }
 
 function BasicInfoSection({ employee, roles, canUpdate, onSaved }) {
-  const [form, setForm] = useState({ name: "", position: "", roleId: "", status: "ACTIVE", passwordPlainText: "", workStart: "08:00", workEnd: "16:00", crossesMidnight: false, graceMinutes: "0" });
+  const [form, setForm] = useState({ name: "", position: "", roleId: "", passwordPlainText: "", workStart: "08:00", workEnd: "16:00", graceMinutes: "0" });
   const [formError, setFormError] = useState("");
   const mutation = useUpdateEmployee(String(employee.id), { onSuccess: () => { setForm((current) => ({ ...current, passwordPlainText: "" })); setFormError(""); onSaved?.(); } });
   const conflicted = mutation.isError && isConflict(mutation.error);
@@ -117,11 +142,9 @@ function BasicInfoSection({ employee, roles, canUpdate, onSaved }) {
       name: employee.name || "",
       position: employee.position || "",
       roleId: employee.roleId ? String(employee.roleId) : "",
-      status: employee.status || "ACTIVE",
       passwordPlainText: "",
       workStart: employee.schedule?.workStart || "08:00",
       workEnd: employee.schedule?.workEnd || "16:00",
-      crossesMidnight: Boolean(employee.schedule?.crossesMidnight),
       graceMinutes: String(employee.schedule?.graceMinutes ?? 0),
     });
   }, [employee]);
@@ -146,21 +169,19 @@ function BasicInfoSection({ employee, roles, canUpdate, onSaved }) {
     setForm((current) => ({ ...current, [name]: value }));
   };
 
-  const save = (deactivationReason) => {
+  const save = () => {
     const parsed = updateEmployeeSchema.safeParse({
       name: form.name,
       position: form.position,
       roleId: form.roleId || undefined,
-      status: form.status,
       ...(form.passwordPlainText ? { passwordPlainText: form.passwordPlainText } : {}),
       schedule: {
         workStart: form.workStart,
         workEnd: form.workEnd,
-        crossesMidnight: Boolean(form.crossesMidnight),
+        crossesMidnight: false,
         timezone: "Africa/Cairo",
         graceMinutes: Number(form.graceMinutes),
       },
-      ...(deactivationReason ? { reason: deactivationReason } : {}),
       expectedVersion: Number(employee.version ?? 0),
     });
     if (!parsed.success) {
@@ -171,15 +192,13 @@ function BasicInfoSection({ employee, roles, canUpdate, onSaved }) {
     return mutation.mutateAsync(parsed.data);
   };
 
-  const deactivating = form.status === "INACTIVE";
-
   return (
     <section className="employee-detail-card" aria-label="البيانات الأساسية">
       <h2>البيانات الأساسية</h2>
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          if (!deactivating) save().catch(() => {});
+          save().catch(() => {});
         }}
       >
         <div className="employee-detail-grid">
@@ -187,39 +206,19 @@ function BasicInfoSection({ employee, roles, canUpdate, onSaved }) {
           <Input label="المنصب" name="position" required value={form.position} onChange={(event) => set("position", event.target.value)} />
           <Input label="كلمة مرور جديدة" name="passwordPlainText" type="password" autoComplete="new-password" placeholder="اتركها فارغة بدون تغيير" value={form.passwordPlainText} onChange={(event) => set("passwordPlainText", event.target.value)} />
           <Select label="الدور" name="roleId" value={form.roleId} onChange={(event) => set("roleId", event.target.value)} options={toRoleOptions(roles)} placeholder="بدون تغيير" />
-          <Select
-            label="الحالة"
-            name="status"
-            value={form.status}
-            onChange={(event) => set("status", event.target.value)}
-            options={[
-              { value: "ACTIVE", label: "نشط" },
-              { value: "INACTIVE", label: "موقوف" },
-            ]}
-          />
           <Input label="بداية العمل (HH:MM)" name="workStart" type="time" required value={form.workStart} onChange={(event) => set("workStart", event.target.value)} />
           <Input label="نهاية العمل (HH:MM)" name="workEnd" type="time" required value={form.workEnd} onChange={(event) => set("workEnd", event.target.value)} />
           <Input label="مهلة التأخير (دقيقة)" name="graceMinutes" type="number" min="0" max="180" value={form.graceMinutes} onChange={(event) => set("graceMinutes", event.target.value)} />
         </div>
-        <label className="employee-check">
-          <input type="checkbox" checked={form.crossesMidnight} onChange={(event) => set("crossesMidnight", event.target.checked)} />
-          <span>الوردية تتجاوز منتصف الليل</span>
-        </label>
         {(formError || mutation.isError) && !conflicted && (
           <p className="employee-alert error" role="alert">
             {formError || mutation.error?.message}
           </p>
         )}
         {mutation.isSuccess && <p className="employee-alert success">تم حفظ بيانات الموظف</p>}
-        {deactivating ? (
-          <ConfirmAction danger requireReason pending={mutation.isPending} title="إيقاف الموظف" message="سيتم إيقاف الموظف. اكتب سببًا من 3 أحرف على الأقل." confirmLabel="إيقاف الموظف" onConfirm={(reason) => save(reason)}>
-            إيقاف وحفظ
-          </ConfirmAction>
-        ) : (
-          <Button type="submit" loading={mutation.isPending}>
-            حفظ البيانات
-          </Button>
-        )}
+        <Button type="submit" loading={mutation.isPending}>
+          حفظ البيانات
+        </Button>
       </form>
       <ConflictDialog open={conflicted} onClose={() => mutation.resetAttempt()} onReload={() => { mutation.resetAttempt(); onSaved?.(); }} pending={false} />
     </section>
@@ -238,14 +237,15 @@ function PermissionMatrixSection({ employeeId, employee, roles, canManage, onSav
   void permissions;
 
   const stored = employee?.matrix ?? employee?.permissionsMatrix ?? null;
+  const fallbackRoleId = employee?.roleId ? String(employee.roleId) : "";
 
   useEffect(() => {
     const matrix = stored || {};
-    const initialRole = matrix.roleId ? String(matrix.roleId) : "";
-    const rawPermissions = Array.isArray(matrix.permissions) ? matrix.permissions : [];
-    const initialAllowed = rawPermissions
+    const initialRole = matrix.roleId ? String(matrix.roleId) : fallbackRoleId;
+    const rawRows = Array.isArray(matrix.permissions) ? matrix.permissions : Array.isArray(matrix.rows) ? matrix.rows : [];
+    const initialAllowed = rawRows
       .filter((entry) => (typeof entry === "string" ? true : entry?.effect === "ALLOW"))
-      .map((entry) => (typeof entry === "string" ? entry : String(entry.permissionKey)));
+      .map((entry) => (typeof entry === "string" ? entry : String(entry.permissionKey ?? entry.key)));
     const rawPages = Array.isArray(matrix.pages) ? matrix.pages : [];
     const initialPages = {};
     for (const page of rawPages) {
@@ -254,29 +254,72 @@ function PermissionMatrixSection({ employeeId, employee, roles, canManage, onSav
     setRoleId(initialRole);
     setAllowed(initialAllowed);
     setPagesVisible(initialPages);
-  }, [stored]);
+  }, [stored, fallbackRoleId]);
 
-  const groups = useMemo(() => catalog.data?.byPage || [], [catalog.data]);
+  const sidebarPages = useMemo(() => {
+    const seen = new Map();
+    for (const entry of adminNavigation) {
+      if (entry?.pageKey && !seen.has(entry.pageKey)) seen.set(entry.pageKey, entry.pageName || entry.pageKey);
+    }
+    return [...seen.entries()].map(([pageKey, pageName]) => ({ pageKey, pageName }));
+  }, []);
+  const pageRows = useMemo(() => {
+    const rows = [];
+    for (let index = 0; index < sidebarPages.length; index += 2) {
+      rows.push(sidebarPages.slice(index, index + 2));
+    }
+    return rows;
+  }, [sidebarPages]);
+  const keyToPage = useMemo(() => {
+    const map = new Map();
+    for (const permission of catalog.data?.permissions || []) {
+      if (permission?.key) map.set(String(permission.key), String(permission.pageKey || ""));
+    }
+    return map;
+  }, [catalog.data]);
+  const keysByPage = useMemo(() => {
+    const map = new Map();
+    for (const [key, pageKey] of keyToPage) {
+      if (!map.has(pageKey)) map.set(pageKey, []);
+      map.get(pageKey).push(key);
+    }
+    return map;
+  }, [keyToPage]);
 
   if (!canManage) return null;
 
-  const toggleKey = (key) => {
-    mutation.resetAttempt();
-    setFormError("");
-    setAllowed((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
-  };
-
   const togglePage = (pageKey) => {
     mutation.resetAttempt();
+    setFormError("");
     setPagesVisible((current) => ({ ...current, [pageKey]: (current[pageKey] ?? true) === false }));
   };
 
   const submit = (event) => {
     event.preventDefault();
+    if (catalog.isLoading) {
+      setFormError("انتظر تحميل كتالوج الصلاحيات ثم احفظ مجددًا");
+      return;
+    }
+    const sidebarKeySet = new Set(sidebarPages.map(({ pageKey }) => pageKey));
+    let permissionKeys;
+    if (catalog.isError || keysByPage.size === 0) {
+      permissionKeys = [...new Set(allowed)];
+    } else {
+      const next = new Set();
+      for (const { pageKey } of sidebarPages) {
+        if (pagesVisible[pageKey] ?? true) {
+          for (const key of keysByPage.get(pageKey) ?? []) next.add(key);
+        }
+      }
+      for (const key of allowed) {
+        if (!sidebarKeySet.has(keyToPage.get(key))) next.add(key);
+      }
+      permissionKeys = [...next];
+    }
     const parsed = permissionMatrixSchema.safeParse({
       roleId,
-      permissions: allowed.map((permissionKey) => ({ permissionKey, effect: "ALLOW" })),
-      pages: groups.map((group) => ({ pageKey: group.pageKey, visible: pagesVisible[group.pageKey] ?? true })),
+      permissions: permissionKeys.map((permissionKey) => ({ permissionKey, effect: "ALLOW" })),
+      pages: sidebarPages.map(({ pageKey }) => ({ pageKey, visible: pagesVisible[pageKey] ?? true })),
       expectedPermissionsVersion: Math.max(1, Number(employee?.permissionsVersion ?? 0)),
     });
     if (!parsed.success) {
@@ -295,31 +338,53 @@ function PermissionMatrixSection({ employeeId, employee, roles, canManage, onSav
       </h2>
       <form onSubmit={submit}>
         <Select label="الدور" name="matrixRoleId" required value={roleId} onChange={(event) => setRoleId(event.target.value)} options={toRoleOptions(roles)} placeholder="اختر الدور" />
-        {catalog.isLoading && <p className="employee-empty">جاري تحميل الصلاحيات...</p>}
-        {catalog.isError && <p className="employee-alert error" role="alert">{catalog.error?.message || "تعذر تحميل الصلاحيات"}</p>}
-        {groups.map((group) => (
-          <fieldset key={group.pageKey} className="matrix-group">
-            <legend>
-              <label className="matrix-page-toggle">
-                <input type="checkbox" checked={pagesVisible[group.pageKey] ?? true} onChange={() => togglePage(group.pageKey)} />
-                <span>{group.pageKey} — {pagesVisible[group.pageKey] ?? true ? "ظاهر" : "مخفي"}</span>
-              </label>
-            </legend>
-            {(group.items || []).map((permission) => (
-              <label key={permission.id || permission.key} className="matrix-item">
-                <input type="checkbox" checked={allowed.includes(permission.key)} onChange={() => toggleKey(permission.key)} />
-                <span>{permission.key} — سماح</span>
-              </label>
-            ))}
-          </fieldset>
-        ))}
+        {catalog.isLoading && <p className="employee-empty">جاري تحميل كتالوج الصلاحيات...</p>}
+        {catalog.isError && <p className="employee-alert error" role="alert">تعذر تحميل كتالوج الصلاحيات — سيتم الاحتفاظ بالصلاحيات الحالية عند الحفظ</p>}
+        <div className="employee-table-scroll">
+          <table aria-label="جدول الصلاحيات">
+            <thead>
+              <tr>
+                <th>الصفحة</th>
+                <th>الظهور</th>
+                <th>الصفحة</th>
+                <th>الظهور</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.map((pair, rowIndex) => (
+                <tr key={`matrix-row-${rowIndex}`}>
+                  {pair.map(({ pageKey, pageName }) => {
+                    const visible = pagesVisible[pageKey] ?? true;
+                    return (
+                      <Fragment key={pageKey}>
+                        <td>{pageName}</td>
+                        <td>
+                          <label className="matrix-page-toggle">
+                            <input type="checkbox" checked={visible} onChange={() => togglePage(pageKey)} aria-label={`إظهار صفحة ${pageName}`} />
+                            <span>{visible ? "ظاهر" : "مخفي"}</span>
+                          </label>
+                        </td>
+                      </Fragment>
+                    );
+                  })}
+                  {pair.length === 1 && (
+                    <Fragment key={`matrix-row-${rowIndex}-empty`}>
+                      <td>—</td>
+                      <td>—</td>
+                    </Fragment>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {(formError || mutation.isError) && !conflicted && (
           <p className="employee-alert error" role="alert">
             {formError || mutation.error?.message}
           </p>
         )}
         {mutation.isSuccess && <p className="employee-alert success">تم حفظ مصفوفة الصلاحيات</p>}
-        <Button type="submit" loading={mutation.isPending}>
+        <Button type="submit" loading={mutation.isPending} disabled={catalog.isLoading}>
           حفظ المصفوفة
         </Button>
       </form>
@@ -337,16 +402,22 @@ export default function EmployeeDetailsPage() {
   const canDecide = can(permissions, "employees.devices.decide");
   const canManageMatrix = can(permissions, "employees.permissions.manage");
 
+  const [activityPage, setActivityPage] = useState(1);
+  const [devicePage, setDevicePage] = useState(1);
+  const [attendancePage, setAttendancePage] = useState(1);
   const include = useMemo(
-    () => (canViewPassword ? ["password", "devices", "attendance", "permissions"] : ["devices", "attendance", "permissions"]),
+    () => (canViewPassword ? ["password", "attendance", "permissions", "activity"] : ["attendance", "permissions", "activity"]),
     [canViewPassword],
   );
-  const details = useEmployeeDetails(id, include);
+  const details = useEmployeeDetails(id, include, { activityPage, activityLimit: 10, attendancePage, attendanceLimit: 10 });
+  const devicesQuery = useEmployeeDevices({ employeeId: id, page: devicePage, limit: 10 });
   const rolesQuery = useRoles();
   const roles = rolesQuery.data?.roles || [];
+  const deleteMutation = useDeleteEmployee();
+  const currentEmployeeId = useAuthStore((state) => state.employee?.id);
 
   const refetchAll = async () => {
-    await details.refetch();
+    await Promise.all([details.refetch(), devicesQuery.refetch()]);
   };
 
   if (details.isLoading) return <p className="employee-details-state">جاري تحميل الموظف...</p>;
@@ -368,18 +439,47 @@ export default function EmployeeDetailsPage() {
     );
   }
 
-  const devices = asItems(details.data?.devices);
+  const devices = Array.isArray(devicesQuery.data?.items) ? devicesQuery.data.items : [];
+  const devicesPageMeta = devicesQuery.data?.pageMeta;
   const attendance = asItems(details.data?.attendance);
+  const attendancePageMeta = details.data?.attendance?.pageMeta;
   const passwordPlainText = details.data?.passwordPlainText ?? null;
+  const employeeRole = roles.find((role) => String(role.id) === String(employee?.roleId));
+  const isAdminEmployee = Boolean(employeeRole) && (employeeRole.name === "Admin" || Number(employeeRole.level ?? 0) >= 100);
 
   return (
     <div className="employee-details-page" dir="rtl">
       <PageHeader title={`الموظف: ${employee.name || "—"}`} breadcrumbs={["الموظفون", employee.name || "التفاصيل"]} />
       <div className="employee-details-shell">
-        <button type="button" className="employee-back" onClick={() => navigate("/admin/employees")}>
-          <ArrowRight size={16} />
-          رجوع
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" className="employee-back" onClick={() => navigate("/admin/employees")}>
+            <ArrowRight size={16} />
+            رجوع
+          </button>
+          {canUpdate && (
+            <Button
+              variant="secondary"
+              onClick={() => document.querySelector('[aria-label="البيانات الأساسية"]')?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            >
+              <Pencil size={16} />
+              تعديل بيانات الموظف
+            </Button>
+          )}
+          {canUpdate && String(currentEmployeeId ?? "") !== String(employee.id) && (
+            <ConfirmAction
+              danger
+              triggerClassName="employee-delete"
+              title="حذف نهائي للموظف"
+              message={`سيتم حذف ${employee.name} نهائيا ولا يمكن التراجع عن ذلك.`}
+              confirmLabel="حذف نهائي"
+              pending={deleteMutation.isPending}
+              onConfirm={() => deleteMutation.mutateAsync({ employeeId: String(employee.id), expectedVersion: Number(employee.version ?? 0) }).then(() => navigate("/admin/employees"))}
+            >
+              <Trash2 size={16} />
+              حذف نهائي
+            </ConfirmAction>
+          )}
+        </div>
 
         <BasicInfoSection employee={employee} roles={roles} canUpdate={canUpdate} onSaved={refetchAll} />
 
@@ -405,6 +505,7 @@ export default function EmployeeDetailsPage() {
                   <th>الجهاز</th>
                   <th>المتصفح</th>
                   <th>النظام</th>
+                  <th>المحاولات</th>
                   <th>الحالة</th>
                   <th>آخر ظهور</th>
                   <th>القرار</th>
@@ -417,41 +518,84 @@ export default function EmployeeDetailsPage() {
               </tbody>
             </table>
           </div>
-          {devices.length === 0 && <p className="employee-empty">لم يسجل أي جهاز بعد</p>}
+          {devicesQuery.isLoading && <p className="employee-empty">جاري تحميل الأجهزة...</p>}
+          {devicesQuery.isError && <p className="employee-alert error" role="alert">{devicesQuery.error?.message || "تعذر تحميل الأجهزة"}</p>}
+          {!devicesQuery.isLoading && !devicesQuery.isError && devices.length === 0 && <p className="employee-empty">لم يسجل أي جهاز بعد</p>}
+          <ServerPagination
+            meta={devicesPageMeta}
+            onPageChange={(next) => setDevicePage(next)}
+            label="جهاز"
+          />
         </section>
 
-        <PermissionMatrixSection employeeId={String(employee.id)} employee={{ ...employee, matrix: details.data?.permissions }} roles={roles} canManage={canManageMatrix} onSaved={refetchAll} />
+        {!isAdminEmployee && (
+          <PermissionMatrixSection employeeId={String(employee.id)} employee={{ ...employee, matrix: details.data?.permissions }} roles={roles} canManage={canManageMatrix} onSaved={refetchAll} />
+        )}
 
-        <section className="employee-detail-card" aria-label="الحضور الأخير">
-          <h2>الحضور الأخير</h2>
+        {!isAdminEmployee && (
+        <section className="employee-detail-card" aria-label="سجل الحضور">
+          <h2>سجل الحضور</h2>
           <div className="employee-table-scroll">
             <table>
               <thead>
                 <tr>
                   <th>التاريخ</th>
-                  <th>الحضور</th>
-                  <th>الانصراف</th>
+                  <th>ساعة الحضور</th>
+                  <th>ساعة الانصراف</th>
                   <th>الحالة</th>
-                  <th>إجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {attendance.slice(0, 10).map((record) => (
+                {attendance.map((record) => (
                   <tr key={String(record.id || record.attendanceDate)}>
                     <td>{formatDate(record.attendanceDate)}</td>
-                    <td>{formatDateTime(record.checkInAt)}</td>
-                    <td>{formatDateTime(record.checkOutAt)}</td>
+                    <td>{formatTime(record.checkInAt)}</td>
+                    <td>{formatTime(record.checkOutAt)}</td>
                     <td>{record.statusLabel || record.status || "—"}</td>
-                    <td>{record.id ? <AttendanceActions record={record} /> : <span>—</span>}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           {attendance.length === 0 && <p className="employee-empty">لا يوجد حضور مسجل</p>}
-          <Button variant="secondary" onClick={() => navigate("/admin/employees?tab=attendance")}>
-            فتح سجل الحضور الكامل
-          </Button>
+          <ServerPagination
+            meta={attendancePageMeta}
+            onPageChange={(next) => setAttendancePage(next)}
+            label="حضور"
+          />
+        </section>
+        )}
+
+        <section className="employee-detail-card" aria-label="سجل الأنشطة">
+          <h2>سجل الأنشطة</h2>
+          <div className="employee-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>الحدث</th>
+                  <th>الإجراء</th>
+                  <th>الوقت</th>
+                  <th>النتيجة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(asItems(details.data?.activity).slice(0, 10) || []).map((ev) => (
+                  <tr key={String(ev.eventNo || ev.id || ev.occurredAt)}>
+                    <td>{ev.eventType || ev.action || "—"}</td>
+                    <td>{ev.action || "—"}</td>
+                    <td>{formatDateTime(ev.occurredAt)}</td>
+                    <td>{ev.result || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {asItems(details.data?.activity).length === 0 && <p className="employee-empty">لا يوجد نشاط مسجل</p>}
+          <ServerPagination
+            meta={details.data?.activity?.pageMeta}
+            onPageChange={(next) => setActivityPage(next)}
+            label="نشاط"
+          />
         </section>
       </div>
     </div>

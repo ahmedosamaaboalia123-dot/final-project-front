@@ -19,23 +19,45 @@
   padding: var(--space-sm);
 }
 
-/* ── Online customer fields ── */
+/* ── Online customer fields (inside invoice strip) ── */
 .sales-customer-fields {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   flex-shrink: 0;
-  padding: 0 var(--space-xs);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.sales-customer-fields label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: var(--fw-bold);
+  color: var(--text-main);
+  min-width: 0;
+}
+
+.sales-customer-fields label span {
+  white-space: nowrap;
 }
 
 .sales-customer-fields input {
-  height: 38px;
+  height: 40px;
   border: 1px solid var(--border-main);
   border-radius: var(--radius-sm);
   padding: 0 10px;
   font-family: var(--font-family);
   font-size: var(--fs-xs);
   text-align: right;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sales-customer-fields input:focus {
+  border-color: var(--primary);
+  outline: none;
 }
 
 .fulfillment-switch {
@@ -45,7 +67,8 @@
 }
 
 .fulfillment-switch button {
-  min-height: 38px;
+  flex: 1;
+  min-height: 40px;
   padding: 0 16px;
   border: 1px solid var(--border-main);
   border-radius: var(--radius-sm);
@@ -53,6 +76,7 @@
   cursor: pointer;
   font-family: var(--font-family);
   font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
 }
 
 .fulfillment-switch button.active {
@@ -65,7 +89,7 @@
 .sales-layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 150px 1fr;
+  grid-template-columns: 220px 1fr;
   gap: var(--space-sm);
   min-height: 0;
   overflow: hidden;
@@ -92,15 +116,16 @@
 }
 
 .sales-sections-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 .sales-section-btn {
   width: 100%;
-  text-align: right;
-  padding: 7px 10px;
+  min-height: 56px;
+  text-align: center;
+  padding: 8px 6px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -137,8 +162,29 @@
 
 .sales-products-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: var(--space-xs);
+}
+
+.sales-products-search {
+  flex-shrink: 0;
+}
+
+.sales-products-search input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 40px;
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  font-family: var(--font-family);
+  font-size: var(--fs-xs);
+  text-align: right;
+}
+
+.sales-products-search input:focus {
+  border-color: var(--primary);
+  outline: none;
 }
 
 .sales-product-card {
@@ -276,8 +322,8 @@
 }
 
 .sales-invoice-qty button {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--border-main);
   border-radius: var(--radius-sm);
   background: var(--card-bg);
@@ -353,7 +399,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-xs);
-  height: 38px;
+  min-height: 44px;
   padding: 0 var(--space-md);
   border: none;
   border-radius: var(--button-radius);
@@ -379,7 +425,11 @@
 /* ── Responsive: tablet ── */
 @media (max-width: 900px) {
   .sales-layout {
-    grid-template-columns: 110px 1fr;
+    grid-template-columns: 170px 1fr;
+  }
+
+  .sales-customer-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -403,6 +453,7 @@
   }
 
   .sales-sections-list {
+    display: flex;
     flex-direction: row;
     gap: 3px;
   }
@@ -410,6 +461,21 @@
   .sales-section-btn {
     white-space: nowrap;
     padding: 6px 12px;
+    min-height: 44px;
+  }
+
+  .sales-customer-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sales-customer-fields input,
+  .fulfillment-switch button,
+  .sales-products-search input {
+    min-height: 44px;
+  }
+
+  .btn-confirm-invoice {
+    width: 100%;
   }
 
   .sales-products-grid {

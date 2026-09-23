@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./ConfirmAction.css";
 
-export default function ConfirmAction({ children, title = "تأكيد الإجراء", message = "هل تريد المتابعة؟", confirmLabel = "تأكيد", cancelLabel = "إلغاء", requireReason = false, reasonLabel = "السبب", minReasonLength = 3, pending = false, disabled = false, danger = false, onConfirm }) {
+export default function ConfirmAction({ children, title = "تأكيد الإجراء", message = "هل تريد المتابعة؟", confirmLabel = "تأكيد", cancelLabel = "إلغاء", requireReason = false, reasonLabel = "السبب", minReasonLength = 3, pending = false, disabled = false, danger = false, triggerClassName = "", onConfirm }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const reasonValid = !requireReason || reason.trim().length >= minReasonLength;
@@ -16,7 +16,7 @@ export default function ConfirmAction({ children, title = "تأكيد الإجر
     }
   };
   return <>
-    <button type="button" className={danger ? "confirm-trigger confirm-trigger--danger" : "confirm-trigger"} disabled={disabled || pending} onClick={() => setOpen(true)}>{children}</button>
+    <button type="button" className={`${danger ? "confirm-trigger confirm-trigger--danger" : "confirm-trigger"}${triggerClassName ? ` ${triggerClassName}` : ""}`} disabled={disabled || pending} onClick={() => setOpen(true)}>{children}</button>
     {open && <div className="confirm-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && close()}>
       <section className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-action-title">
         <h2 id="confirm-action-title">{title}</h2><p>{message}</p>

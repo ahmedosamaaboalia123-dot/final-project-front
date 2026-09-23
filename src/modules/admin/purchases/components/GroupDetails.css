@@ -4,6 +4,12 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.purchase-details > * {
+  min-width: 0;
 }
 
 .purchase-back-btn {
@@ -87,6 +93,14 @@
 
 .purchase-details__print {
   display: flex;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #ede3da;
+  border-radius: 12px;
 }
 
 .purchase-details__table {
@@ -207,6 +221,46 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.purchase-details__actions .confirm-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 10px;
+  border: 1px solid #e6d8cb;
+  background-color: #f8f3ed;
+  color: #8b5a2b;
+  font-family: var(--font-family, "Cairo", sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.purchase-details__actions .confirm-trigger:hover:not(:disabled) {
+  background-color: #8b5a2b;
+  border-color: #8b5a2b;
+  color: #ffffff;
+}
+
+.purchase-details__actions .confirm-trigger--danger {
+  background-color: #fdf2f2;
+  border-color: #f8d7da;
+  color: #d32f2f;
+}
+
+.purchase-details__actions .confirm-trigger--danger:hover:not(:disabled) {
+  background-color: #d32f2f;
+  border-color: #d32f2f;
+  color: #ffffff;
+}
+
+.purchase-details__actions .confirm-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .purchase-secondary-btn {
@@ -331,6 +385,13 @@
   .purchase-back-btn,
   .purchase-secondary-btn {
     min-height: 44px;
+  }
+
+  .purchase-details__actions .confirm-trigger,
+  .purchase-details__actions .purchase-secondary-btn,
+  .purchase-details__card > header .purchase-primary-btn--sm {
+    flex: 1 1 100%;
+    justify-content: center;
   }
 
   .purchase-details__edit-actions {

@@ -116,22 +116,22 @@ const normalizeMenuItem = (raw) => {
 };
 
 export async function getPublicMenu() {
-  const now = Date.now();
-  if (cache.data && now - cache.fetchedAt < CACHE_TTL_MS) {
-    return cache.data;
+  // Unified: v1 is source of truth (/api/v1/catalog). Keep legacy as fallback for transition.
+  const v1 = await getV1Menu();
+  if (v1.fromBackend) {
+    const catalog = { items: v1.items, fromBackend: true, fetchedAt: v1.fetchedAt };
+    cache = { data: catalog, fetchedAt: Date.now(), inFlight: null };
+    return catalog;
   }
+  const now = Date.now();
+  if (cache.data && now - cache.fetchedAt < CACHE_TTL_MS) return cache.data;
   if (cache.inFlight) return cache.inFlight;
-
   const run = (async () => {
     try {
       const payload = await apiClient.get(endpoints.publicProducts.list);
       const items = innerData(payload);
       const list = Array.isArray(items) ? items : [];
-      const catalog = {
-        items: list.map(normalizeMenuItem),
-        fromBackend: true,
-        fetchedAt: Date.now(),
-      };
+      const catalog = { items: list.map(normalizeMenuItem), fromBackend: true, fetchedAt: Date.now() };
       cache = { data: catalog, fetchedAt: Date.now(), inFlight: null };
       return catalog;
     } catch (err) {
@@ -140,7 +140,6 @@ export async function getPublicMenu() {
       return { items: [], fromBackend: false, fetchedAt: 0 };
     }
   })();
-
   cache.inFlight = run;
   return cache.inFlight;
 }
@@ -228,25 +227,22 @@ const categoryIdFromName = (name) =>
   categoryIdFrom({ categoryName: name, category: name });
 
 export async function getPublicCategories() {
-  const now = Date.now();
-  if (catCache.data && now - catCache.fetchedAt < CACHE_TTL_MS) {
-    return catCache.data;
+  const v1 = await getV1Menu();
+  if (v1.fromBackend && Array.isArray(v1.categories) && v1.categories.length) {
+    catCache = { data: v1.categories, fetchedAt: Date.now(), inFlight: null };
+    return v1.categories;
   }
+  const now = Date.now();
+  if (catCache.data && now - catCache.fetchedAt < CACHE_TTL_MS) return catCache.data;
   if (catCache.inFlight) return catCache.inFlight;
-
   const run = (async () => {
     try {
       const payload = await apiClient.get(endpoints.publicProducts.categories);
       const raw = innerData(payload);
       const list = Array.isArray(raw) ? raw : [];
       const categories = list
-        .filter((c) => !c.isActive || c.isActive === true)
-        .map((c) => ({
-          id: categoryIdFromName(c.name),
-          title: c.name || "الكل",
-          englishTitle: "",
-          icon: "Coffee",
-        }));
+        .filter((c) => c.isActive !== false)
+        .map((c) => ({ id: categoryIdFromName(c.name), title: c.name || "الكل", englishTitle: "", icon: "Coffee" }));
       catCache = { data: categories, fetchedAt: Date.now(), inFlight: null };
       return categories;
     } catch (err) {
@@ -255,7 +251,6 @@ export async function getPublicCategories() {
       return [];
     }
   })();
-
   catCache.inFlight = run;
   return catCache.inFlight;
 }

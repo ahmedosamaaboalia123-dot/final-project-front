@@ -34,6 +34,8 @@
     font-size: var(--fs-lg);
     font-weight: var(--fw-bold);
     color: var(--text-main);
+    overflow-wrap: anywhere;
+    text-align: center;
 }
 
 .card-item__status {
@@ -53,15 +55,51 @@
     margin-top: var(--space-xs);
 }
 
+.card-item small {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
 .card-item__outside {
     display: inline-block;
-    background: #e0555a;
+    background: var(--danger);
     color: #fff;
     font-size: 11px;
     font-weight: 700;
     padding: 2px 8px;
     border-radius: 999px;
     margin-inline-start: 6px;
+}
+
+.card-item__delegate {
+    display: inline-block;
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-inline-start: 6px;
+}
+
+.card-item__customer,
+.card-item__phone,
+.card-item__address {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-main);
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
+}
+
+.card-item__address {
+    color: var(--text-secondary);
+    font-weight: 400;
 }
 
 @media (max-width: 1200px) {
@@ -79,5 +117,11 @@
 @media (max-width: 600px) {
     .card-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 400px) {
+    .card-grid {
+        grid-template-columns: 1fr;
     }
 }

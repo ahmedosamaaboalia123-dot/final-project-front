@@ -33,3 +33,4 @@
 .order-barcode strong { display: block; margin-top: 4px; font-family: monospace; font-size: 12px; letter-spacing: 2px; }
 .checkout-success-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 @media (max-width: 640px) { .checkout-modal-backdrop { align-items: flex-end; padding: 0; } .checkout-modal { max-height: 94vh; border-radius: 22px 22px 0 0; padding: 18px 14px; } .checkout-form-grid { grid-template-columns: 1fr; } .checkout-footer { align-items: stretch; flex-direction: column; } .checkout-primary-btn { width: 100%; min-height: 48px; } }
+.checkout-submit-error{grid-column:1/-1;margin:0;padding:10px 12px;border-radius:10px;background:#fff1f0;border:1px solid #ffc9c5;color:#a12620;font-size:13px;font-weight:700}

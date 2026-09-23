@@ -200,6 +200,32 @@
   color: #4b2f22;
 }
 
+.employee-delete {
+  border: 1px solid #f3c1c1;
+  border-radius: 9px;
+  min-height: 44px;
+  padding: 7px 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  background: #fdecec;
+  color: #b3261e;
+}
+
+.employee-delete:hover:not(:disabled) {
+  background: #fbdcdc;
+  border-color: #e79a9a;
+}
+
+.employee-delete:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .device-actions {
   display: flex;
   flex-wrap: wrap;

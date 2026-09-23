@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Bot, Sparkles, Coffee } from "lucide-react";
-import { MENU_CATEGORIES, MENU_PRODUCTS, FILTER_OPTIONS } from "../data/menuData";
+// Mock categories/products kept only for reference — real catalog is source of truth
+import { FILTER_OPTIONS } from "../data/menuData";
 import MenuHeader from "../components/MenuHeader";
 import MenuCategoryNav from "../components/MenuCategoryNav";
 import MenuFilterSidebar from "../components/MenuFilterSidebar";
@@ -59,8 +60,8 @@ export default function MenuPage({ tableMode = false, tableNumberOverride, onTab
   const ordersPath = tableMode ? `/table/${tableNumber}/orders` : "/customer/orders";
   const chatbotPath = tableMode ? `/table/${tableNumber}/chatbot` : "/customer/chatbot";
 
-  // Category State (Default: 'coffee' matching the mockup)
-  const [activeCategory, setActiveCategory] = useState(queryParams.get("category") || "coffee");
+  // Category State — default "all" shows every product
+  const [activeCategory, setActiveCategory] = useState(queryParams.get("category") || "all");
 
   // Filters State (Default: 'مثلج' + 'عادي' + maxPrice 100 matching mockup)
   const [selectedTypes, setSelectedTypes] = useState([]);
@@ -75,13 +76,26 @@ export default function MenuPage({ tableMode = false, tableNumberOverride, onTab
 
   // Cart State (Initialized with 2 items matching the screenshot: Spanish Latte 65 EGP + Caramel Macchiato 70 EGP = 135 EGP)
   const [cartItems, setCartItems] = useState(() => {
-    if (!tableMode) return [];
+    if (!tableMode) {
+      try {
+        return JSON.parse(localStorage.getItem("404_customer_cart_v1") || "[]");
+      } catch {
+        return [];
+      }
+    }
     try {
       return JSON.parse(localStorage.getItem(`404_table_cart_${tableNumber}`) || "[]");
     } catch {
       return [];
     }
   });
+
+  useEffect(() => {
+    if (tableMode) return;
+    try {
+      localStorage.setItem("404_customer_cart_v1", JSON.stringify(cartItems));
+    } catch {}
+  }, [cartItems, tableMode]);
 
   useEffect(() => {
     if (!tableMode) return;
@@ -220,13 +234,26 @@ export default function MenuPage({ tableMode = false, tableNumberOverride, onTab
     setCartItems((prev) => prev.filter((item) => item.id !== productId));
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cartItems.length === 0) return;
     setIsCartOpen(false);
     if (tableMode) {
-      onTableRequestWaiter?.();
-      setOrderToast(`السلة جاهزة. أخبر الجرسون بطلبات طاولة رقم ${tableNumber} عند حضوره.`);
-      setTimeout(() => setOrderToast(null), 4000);
+      try {
+        const { useTable } = await import("../../../table/context/TableContext");
+        // Fallback: try to use table gateway directly with current cart + tableToken
+        const { tableSessionStorage } = await import("../../../table/services/tableSessionStorage");
+        const { submitV1TableProposal } = await import("../../../table/services/tableGateway");
+        const session = tableSessionStorage.read(String(tableNumber));
+        const token = session?.tableToken || "";
+        if (!token) throw new Error("جاري تجهيز الطاولة...");
+        await submitV1TableProposal(cartItems, token);
+        setCartItems([]);
+        setOrderToast(`تم إرسال طلب طاولة ${tableNumber} للجرسون — مراجعة طلب`);
+        setTimeout(() => setOrderToast(null), 4000);
+      } catch (e) {
+        setOrderToast(e?.response?.data?.error?.messageAr || e.message || "تعذر إرسال الطلب");
+        setTimeout(() => setOrderToast(null), 4000);
+      }
       return;
     }
     setIsCheckoutOpen(true);
@@ -237,8 +264,9 @@ export default function MenuPage({ tableMode = false, tableNumberOverride, onTab
       const access = customerStorage.getOrderAccess(addToOrderNumber);
       if (!access?.orderActionToken || !access?.trackingReadToken) throw new Error("رمز تعديل الطلب غير متاح على هذا الجهاز");
       const tracking = await customerOrdersApi.tracking(addToOrderNumber, access.trackingReadToken);
-      const bodyItems = checkoutData.items.map((item) => ({ productId: String(item.originalId || item.productId || item.id), productSizeId: String(item.productSizeId || item.customizations?.sizeId), quantity: Number(item.quantity) || 1 }));
-      await customerOrdersApi.addItems(addToOrderNumber, { items: bodyItems, expectedVersion: Number(tracking.version ?? tracking.eventSequence ?? 0) }, access.orderActionToken, globalThis.crypto?.randomUUID?.() || String(Date.now()));
+      const { resolveOrderItems } = await import("../../checkout/services/orderGateway");
+      const bodyItems = await resolveOrderItems(checkoutData.items);
+      await customerOrdersApi.addItems(addToOrderNumber, { items: bodyItems, expectedVersion: Number(tracking.version ?? tracking.eventSequence ?? 0) || 0 }, access.orderActionToken, globalThis.crypto?.randomUUID?.() || String(Date.now()));
       setIsCheckoutOpen(false); setCartItems([]); navigate(`/customer/orders/${encodeURIComponent(addToOrderNumber)}/track`); return;
     }
     const order = await createOrder.mutateAsync(checkoutData);
@@ -247,43 +275,31 @@ export default function MenuPage({ tableMode = false, tableNumberOverride, onTab
     setCartItems([]);
   };
 
-  // Catalog data source. When the backend loaded (even if empty) we use its
-  // results; otherwise we fall back to the bundled demo data.
+  // Real catalog only — no Mock fallback
   const catalogAvailable = Boolean(catalog?.fromBackend);
   const bestSellerSet = bestSellerIds ?? new Set();
-  const sourceProducts = (catalogAvailable ? catalog.items : MENU_PRODUCTS).map(
-    (product) => ({
-      ...product,
-      isBestSeller:
-        bestSellerSet.has(String(product.id)) || Boolean(product.isBestSeller),
-    })
-  );
-  const derivedCategories = catalogAvailable
-    ? buildCatalogCategories(catalog.items)
-    : MENU_CATEGORIES;
+  const sourceProducts = (catalog?.items ?? []).map((product) => ({
+    ...product,
+    isBestSeller: bestSellerSet.has(String(product.id)) || Boolean(product.isBestSeller),
+  }));
+  const derivedCategories = buildCatalogCategories(catalog?.items ?? []);
   // Sections come from the real backend products (buildCatalogCategories) so
   // each pill id matches the product categories exactly. When the public
   // backend category names are available, use them as the authoritative labels
   // for the matching pills (no fabricated sections, no empty pills).
   const sourceCategories = useMemo(() => {
-    const base = derivedCategories;
-    const backendCats = Array.isArray(catalogCategories) ? catalogCategories : [];
-    if (!base || base.length === 0) return backendCats.length ? backendCats : MENU_CATEGORIES;
-    const titleById = {};
-    base.forEach((c) => {
-      titleById[c.id] = titleById[c.id] || c.title;
-    });
-    backendCats.forEach((c) => {
-      if (titleById[c.id]) titleById[c.id] = c.title;
-    });
-    return base.map((c) => ({ ...c, title: titleById[c.id] || c.title }));
+    const base = derivedCategories.filter(Boolean);
+    const backendCats = Array.isArray(catalogCategories) ? catalogCategories.filter((c)=>c && c.title) : [];
+    const real = backendCats.length ? backendCats : base;
+    const allPill = { id: "all", title: "كل المنتجات", englishTitle: "All", icon: "Sparkles" };
+    return [allPill, ...real];
   }, [derivedCategories, catalogCategories]);
 
-  // Filter products logic
+  // Filter products logic — "all" shows every product
   const filteredProducts = useMemo(() => {
     return sourceProducts.filter((product) => {
-      // Category filter (if category is selected)
-      if (activeCategory && product.category !== activeCategory && product.categoryType !== activeCategory) {
+      // Category filter (skip when "all")
+      if (activeCategory && activeCategory !== "all" && product.category !== activeCategory && product.categoryType !== activeCategory) {
         return false;
       }
 
@@ -307,13 +323,12 @@ export default function MenuPage({ tableMode = false, tableNumberOverride, onTab
         return false;
       }
 
-      // Search query filter
+      // Search: name + category (per spec)
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
-        const matchName = product.name.toLowerCase().includes(query);
-        const matchEng = product.englishName?.toLowerCase().includes(query);
-        const matchDesc = product.description.toLowerCase().includes(query);
-        if (!matchName && !matchEng && !matchDesc) return false;
+        const matchName = String(product.name||"").toLowerCase().includes(query);
+        const matchCat = String(product.categoryName||product.category||"").toLowerCase().includes(query);
+        if (!matchName && !matchCat) return false;
       }
 
       return true;

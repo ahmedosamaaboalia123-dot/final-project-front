@@ -6,7 +6,7 @@ import { useTable } from "../../context/TableContext";
 import TableActiveOrderHeroBar from "../components/TableActiveOrderHeroBar";
 import TableNavDrawer from "../components/TableNavDrawer";
 import CustomerHeader from "../../../customer/main-page/components/CustomerHeader";
-import HeroBanner from "../../../customer/main-page/components/HeroBanner";
+import TableHeroBanner from "../components/TableHeroBanner";
 import SearchBar from "../../../customer/main-page/components/SearchBar";
 import CategoryCards from "../../../customer/main-page/components/CategoryCards";
 import BestSellersSection from "../../../customer/main-page/components/BestSellersSection";
@@ -26,11 +26,11 @@ import PersonalityQuizModal from "../../../customer/main-page/components/Persona
 import InviteFriendsModal from "../../../customer/main-page/components/InviteFriendsModal";
 import NotificationsModal from "../../../customer/main-page/components/NotificationsModal";
 import TrackOrdersModal from "../../../customer/main-page/components/TrackOrdersModal";
-import RateCafeModal from "../../../customer/main-page/components/RateCafeModal";
 
 // Data & Styles
 import { MAIN_PAGE_DATA } from "../../../customer/main-page/data/mainPageData";
-import { getTopProducts, getPublicMenu } from "@/services/catalogService";
+import { getTopProducts, getPublicMenu, getPublicCategories } from "@/services/catalogService";
+import { reviewsApi } from "@/modules/admin/reviews/api/reviews.api";
 import "../../../customer/main-page/styles/CustomerMainPage.css";
 import "../../styles/TableModule.css";
 
@@ -60,6 +60,19 @@ export default function TableMainPage() {
   const [recentlyAddedId, setRecentlyAddedId] = useState(null);
   const [localToast, setLocalToast] = useState(null);
   const [topProducts, setTopProducts] = useState(null);
+  const [realCategories, setRealCategories] = useState([]);
+  const [latestReviews, setLatestReviews] = useState([]);
+  const CAFE_BRANCH = {
+    name: "فرع ايتاي البارود",
+    address: "محافظة البحيرة - مركز ايتاي البارود - شارع ابو بكر الصديق متفرع من شارع مجلس المدينة بجوار كنيسة العذراء مريم",
+    mapUrl: "https://www.google.com/maps?q=30.882471084594727,30.66588020324707&z=17&hl=en",
+    hours: "يوميا 8ص - 12ص",
+    phone: "01000000404",
+    image: "https://images.unsplash.com/photo-1445116572660-236099ec97a0?auto=format&fit=crop&w=800&q=80",
+    reception: "نستقبلك يومياً",
+    singleBranchText: "فرع واحد فقط",
+    tagline: "أقرب إليك دائماً",
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +85,8 @@ export default function TableMainPage() {
         .filter(Boolean);
       setTopProducts(joined);
     });
+    getPublicCategories().then((cats) => { if (!cancelled) setRealCategories(Array.isArray(cats) ? cats.filter((c) => c.isActive !== false) : []); });
+    reviewsApi.publicList({ page: 1, limit: 3 }).then((res) => { if (cancelled) return; const items = res?.items || res?.data || []; setLatestReviews(Array.isArray(items) ? items.slice(0,3) : []); }).catch(()=>{});
     return () => { cancelled = true; };
   }, []);
 
@@ -83,7 +98,6 @@ export default function TableMainPage() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false);
   const [isTrackOrdersOpen, setIsTrackOrdersOpen] = useState(false);
-  const [isRateCafeOpen, setIsRateCafeOpen] = useState(false);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
 
   const showToast = (msg) => {
@@ -91,15 +105,15 @@ export default function TableMainPage() {
     setTimeout(() => setLocalToast(null), 3000);
   };
 
-  // Filter products by search query
-  const bestSellers = topProducts && topProducts.length > 0 ? topProducts : MAIN_PAGE_DATA.bestSellers;
+  // Filter: top products by search (name + category)
+  const bestSellers = topProducts ?? [];
   const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return bestSellers;
     return bestSellers.filter((prod) => {
-      const matchesSearch =
-        !searchQuery.trim() ||
-        prod.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (prod.englishName || "").toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
+      const name = String(prod.name||"").toLowerCase();
+      const cat = String(prod.categoryName||prod.category||"").toLowerCase();
+      return name.includes(q) || cat.includes(q);
     });
   }, [searchQuery, bestSellers]);
 
@@ -123,7 +137,7 @@ export default function TableMainPage() {
     } else if (action === "games") {
       navigate(`/table/${tableNumber}/feedback`);
     } else if (action === "rate") {
-      setIsRateCafeOpen(true);
+      navigate(`/table/${tableNumber}/feedback`);
     }
   };
 
@@ -136,7 +150,7 @@ export default function TableMainPage() {
     } else if (tabId === "cart") {
       setIsCartOpen(true);
     } else if (tabId === "profile") {
-      setIsRateCafeOpen(true);
+      navigate(`/table/${tableNumber}/feedback`);
     } else if (tabId === "home") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -144,7 +158,7 @@ export default function TableMainPage() {
 
   const activeToast = toastMessage || localToast;
 
-  if (!hasTableAccess) return <main className="customer-app-wrapper" dir="rtl" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}><section className="customer-mobile-viewport" style={{ padding: 24, textAlign: "center" }}><h1>الدخول إلى الطاولة</h1><p role={accessError ? "alert" : undefined}>{accessError || "جاري التحقق من رمز QR..."}</p></section></main>;
+  if (!hasTableAccess) return <main className="customer-app-wrapper" dir="rtl" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}><section className="customer-mobile-viewport" style={{ padding: 24, textAlign: "center" }}><h1>جاري تجهيز الطاولة...</h1><p role={accessError ? "alert" : undefined}>{accessError || "لحظات ويتم تحميل القائمة."}</p></section></main>;
 
   return (
     <div className="customer-app-wrapper" dir="rtl">
@@ -175,14 +189,11 @@ export default function TableMainPage() {
             />
           )}
 
-          {/* 2. Hero Banner: المزاج مش موجود؟ القهوة موجودة + أهلاً بك على طاولة رقم X */}
-          <HeroBanner
-            tableNumber={tableNumber}
-            onOrderNow={() => {
-              navigate(`/table/${tableNumber}/menu`);
-            }}
-            onOpenOrders={() => navigate(`/table/${tableNumber}/orders`)}
-            onOpenWaiter={() => navigate(`/table/${tableNumber}/services`)}
+          {/* 2. Hero Banner — بدون روبوت */}
+          <TableHeroBanner
+            onOrderNow={() => navigate(`/table/${tableNumber}/menu`)}
+            onCallWaiter={() => navigate(`/table/${tableNumber}/services`)}
+            onTrackOrder={() => navigate(`/table/${tableNumber}/orders`)}
           />
 
           {/* 4. Search Bar & Filter Button */}
@@ -193,9 +204,9 @@ export default function TableMainPage() {
             onToggleCategoryFilter={() => navigate(`/table/${tableNumber}/menu`)}
           />
 
-          {/* 5. Category Cards (القهوة، المشروبات الباردة، الحلويات، الوجبات الخفيفة، المزيد) */}
+          {/* 5. Category Cards — real only */}
           <CategoryCards
-            categories={MAIN_PAGE_DATA.categories}
+            categories={realCategories.length ? realCategories : []}
             selectedCategory={selectedCategory}
             onSelectCategory={(id) => {
               setSelectedCategory(id);
@@ -211,14 +222,12 @@ export default function TableMainPage() {
             addedItemId={recentlyAddedId}
           />
 
-          <TableReviewsSection onMore={() => navigate(`/table/${tableNumber}/feedback`)} onAdd={() => setIsRateCafeOpen(true)} />
+          <TableReviewsSection reviews={latestReviews} onMore={() => navigate(`/table/${tableNumber}/feedback`)} onAdd={() => navigate(`/table/${tableNumber}/feedback`)} />
 
-          {/* 9. Branch Info & Table Amenities Card */}
+          {/* 9. Branch Info Card */}
           <BranchInfoCard
-            branchData={MAIN_PAGE_DATA.branchInfo}
-            onOpenLocationDetails={() => {
-              showToast(`أنت جالس حالياً على طاولة رقم ${tableNumber} في فرع إيتاي البارود`);
-            }}
+            branchData={CAFE_BRANCH}
+            onOpenLocationDetails={() => window.open(CAFE_BRANCH.mapUrl, "_blank")}
           />
 
           {/* 10. Comprehensive Responsive Footer */}
@@ -298,14 +307,6 @@ export default function TableMainPage() {
           onNavigate={handleNavDrawerAction}
         />
 
-        <RateCafeModal
-          isOpen={isRateCafeOpen}
-          onClose={() => setIsRateCafeOpen(false)}
-          onSubmitRating={(rating) => {
-            setIsRateCafeOpen(false);
-            showToast(`شكراً لك على تقييم خدمة طاولة رقم ${tableNumber}! ❤️`);
-          }}
-        />
       </div>
     </div>
   );

@@ -3,7 +3,8 @@ import axios from "axios";
 
 import { appConfig } from "@/app/config";
 import { useAuthStore } from "@/store/authStore";
-import { updateAdminSocketToken, disconnectAdminSocket } from "@/services/realtime";
+import { refreshV1AccessTokenOnce } from "@/api/v1Client";
+import { updateAdminSocketToken } from "@/services/realtime";
 
 
 
@@ -29,12 +30,17 @@ const apiClient = axios.create({
 
 let refreshPromise = null;
 
-const clearSession = () => {
-    localStorage.removeItem(appConfig.tokenKey);
-    localStorage.removeItem(appConfig.refreshTokenKey);
-    localStorage.removeItem("auth_session");
-    useAuthStore.getState().clearAuth();
-    disconnectAdminSocket();
+const sharedRefresh = () => {
+    if(!refreshPromise){
+        refreshPromise = refreshV1AccessTokenOnce()
+            .then((accessToken) => {
+                useAuthStore.getState().setAccessToken(accessToken);
+                updateAdminSocketToken(accessToken);
+                return accessToken;
+            })
+            .finally(() => { refreshPromise = null; });
+    }
+    return refreshPromise;
 };
 
 
@@ -112,39 +118,22 @@ apiClient.interceptors.response.use(
 
     const originalRequest = error.config;
     const isAuthRequest = originalRequest?.url?.includes("/auth/login") || originalRequest?.url?.includes("/auth/refresh");
-    const refreshToken = localStorage.getItem(appConfig.refreshTokenKey);
 
-    if(error.response?.status === 401 && !isAuthRequest && refreshToken && !originalRequest?._retry){
+    // Session lifecycle is owned by v1Client: refresh through the shared
+    // single-flight (safe with refresh rotation) and never wipe stored
+    // tokens from this legacy client, so a stale parallel request cannot
+    // burn the rotated refresh token or log a valid session out.
+    if(error.response?.status === 401 && !isAuthRequest && !originalRequest?._retry){
         originalRequest._retry = true;
-        if(!refreshPromise){
-            const refreshBase = String(appConfig.apiBaseUrl).replace(/\/+$/, "");
-            const refreshUrl = /\/v1$/i.test(refreshBase) ? `${refreshBase}/auth/refresh` : `${refreshBase}/v1/auth/refresh`;
-            refreshPromise = axios.post(refreshUrl, { refreshToken })
-                .then((response) => {
-                    const tokens = response.data?.data;
-                    if (!response.data?.ok || !tokens?.accessToken || !tokens?.refreshToken) throw new Error("Refresh response is incomplete");
-                    localStorage.setItem(appConfig.tokenKey, tokens.accessToken);
-                    localStorage.setItem(appConfig.refreshTokenKey, tokens.refreshToken);
-                    useAuthStore.getState().setAccessToken(tokens.accessToken);
-                    updateAdminSocketToken(tokens.accessToken);
-                    return tokens.accessToken;
-                })
-                .finally(() => { refreshPromise = null; });
-        }
 
-        return refreshPromise
+        return sharedRefresh()
             .then((accessToken) => {
                 originalRequest.headers.Authorization = `Bearer ${accessToken}`;
                 return apiClient(originalRequest);
             })
             .catch((refreshError) => {
-                clearSession();
                 return Promise.reject(refreshError);
             });
-    }
-
-    if(error.response?.status === 401){
-        clearSession();
     }
 
     return Promise.reject(error);

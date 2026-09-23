@@ -2,6 +2,8 @@
   direction: rtl;
   text-align: right;
   width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .purchases-page__container {
@@ -9,6 +11,11 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+}
+
+.purchases-page__container > * {
+  min-width: 0;
 }
 
 .purchases-tabs {

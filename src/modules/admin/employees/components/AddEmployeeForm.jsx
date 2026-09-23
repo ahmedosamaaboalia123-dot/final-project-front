@@ -14,10 +14,8 @@ const emptyForm = {
   passwordPlainText: "",
   position: "",
   roleId: "",
-  status: "ACTIVE",
   workStart: "08:00",
   workEnd: "16:00",
-  crossesMidnight: false,
   graceMinutes: "0",
 };
 
@@ -57,10 +55,8 @@ export default function AddEmployeeForm({ roles = [] }) {
       passwordPlainText: form.passwordPlainText,
       position: form.position,
       roleId: form.roleId,
-      status: form.status,
       workStart: form.workStart,
       workEnd: form.workEnd,
-      crossesMidnight: Boolean(form.crossesMidnight),
       timezone: "Africa/Cairo",
       graceMinutes: Number(form.graceMinutes),
     });
@@ -98,16 +94,6 @@ export default function AddEmployeeForm({ roles = [] }) {
             options={roleOptions}
             placeholder={roleOptions.length ? "اختر الدور" : "لا توجد أدوار متاحة"}
           />
-          <Select
-            label="الحالة"
-            name="status"
-            value={form.status}
-            onChange={(event) => set("status", event.target.value)}
-            options={[
-              { value: "ACTIVE", label: "نشط" },
-              { value: "INACTIVE", label: "موقوف" },
-            ]}
-          />
           <Input label="بداية العمل (HH:MM)" name="workStart" type="time" required value={form.workStart} onChange={(event) => set("workStart", event.target.value)} />
           <Input label="نهاية العمل (HH:MM)" name="workEnd" type="time" required value={form.workEnd} onChange={(event) => set("workEnd", event.target.value)} />
           <Input
@@ -120,10 +106,6 @@ export default function AddEmployeeForm({ roles = [] }) {
             onChange={(event) => set("graceMinutes", event.target.value)}
           />
         </div>
-        <label className="employee-check">
-          <input type="checkbox" checked={form.crossesMidnight} onChange={(event) => set("crossesMidnight", event.target.checked)} />
-          <span>الوردية تتجاوز منتصف الليل</span>
-        </label>
         <p className="employee-hint">المنطقة الزمنية ثابتة: Africa/Cairo</p>
         {(validationError || mutation.isError) && (
           <p className="employee-alert error" role="alert">

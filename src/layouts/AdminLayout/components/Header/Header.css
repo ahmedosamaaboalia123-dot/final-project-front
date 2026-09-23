@@ -76,6 +76,48 @@
     padding-inline:24px;
 
 
+    flex:1;
+
+
+    min-width:0;
+
+
+}
+
+
+.header__title{
+
+
+    font-size:18px;
+
+
+    font-weight:800;
+
+
+    color:var(--text-main);
+
+
+    white-space:nowrap;
+
+
+    overflow:hidden;
+
+
+    text-overflow:ellipsis;
+
+
+    max-width:36ch;
+
+
+    direction:rtl;
+
+
+    flex:1;
+
+
+    text-align:center;
+
+
 }
 
 
@@ -203,122 +245,17 @@
 
 
 /* ======================
-   Notification
-===================== */
+    Live Clock
+ ===================== */
 
 
-.notification-menu{
-
-
-    position:relative;
-
-
-    width:32px;
-
-
-    height:32px;
-
-
-    display:flex;
-
-
-    justify-content:center;
-
-
-    align-items:center;
-
-
-}
-
-
-.notification-menu span{
-
-
-    position:absolute;
-
-
-    top:0;
-
-
-    right:0;
-
-
-    width:16px;
-
-
-    height:16px;
-
-
-    border-radius:50%;
-
-
-    background:var(--danger);
-
-
-    color:white;
-
-
-    font-size:10px;
-
-
-    display:flex;
-
-
-    justify-content:center;
-
-
-    align-items:center;
-
-
-}
-
-
-
-/* ======================
-   Chat Icon
-===================== */
-
-
-.chat-icon{
-
-
-    position:relative;
-
-
-    width:32px;
-
-
-    height:32px;
-
-
-    display:flex;
-
-
-    justify-content:center;
-
-
-    align-items:center;
-
-
-    color:var(--text-main);
-
-
-}
-
-
-
-/* ======================
-   Shift
-===================== */
-
-
-.shift-card{
+.live-clock{
 
 
     height:34px;
 
 
-    min-width:160px;
+    min-width:220px;
 
 
     padding:0 14px;
@@ -331,225 +268,6 @@
 
 
     background:var(--header-bg);
-
-
-    display:flex;
-
-
-    flex-direction:row;
-
-
-    align-items:center;
-
-
-    justify-content:space-between;
-
-
-    gap:8px;
-
-
-    direction:rtl;
-
-
-    white-space:nowrap;
-
-
-}
-
-
-.shift-card__text{
-
-
-    display:flex;
-
-
-    flex-direction:column;
-
-
-    align-items:flex-end;
-
-
-    gap:2px;
-
-
-    line-height:1.2;
-
-
-}
-
-
-.shift-card strong{
-
-
-    font-size:var(--fs-sm);
-
-
-    font-weight:var(--fw-bold);
-
-
-    color:var(--text-main);
-
-
-}
-
-
-.shift-card span{
-
-
-    font-size:var(--fs-xs);
-
-
-    color:var(--text-secondary);
-
-
-}
-
-
-.shift-card__icon{
-
-
-    color:var(--text-secondary);
-
-
-    flex-shrink:0;
-
-
-}
-
-
-
-/* ======================
-   Date
-===================== */
-
-
-.date-card{
-
-
-    height:34px;
-
-
-    min-width:160px;
-
-
-    padding:0 14px;
-
-
-    border:1px solid var(--border-main);
-
-
-    border-radius:10px;
-
-
-    background:var(--header-bg);
-
-
-    display:flex;
-
-
-    flex-direction:row;
-
-
-    align-items:center;
-
-
-    justify-content:space-between;
-
-
-    gap:8px;
-
-
-    font-size:var(--fs-sm);
-
-
-    direction:rtl;
-
-
-    white-space:nowrap;
-
-
-}
-
-
-.date-card__text{
-
-
-    display:flex;
-
-
-    flex-direction:column;
-
-
-    align-items:flex-end;
-
-
-    gap:2px;
-
-
-    line-height:1.2;
-
-
-}
-
-
-.date-card__weekday{
-
-
-    font-size:var(--fs-xs);
-
-
-    color:var(--text-secondary);
-
-
-}
-
-
-.date-card__date{
-
-
-    font-size:var(--fs-sm);
-
-
-    font-weight:var(--fw-semibold);
-
-
-    color:var(--text-main);
-
-
-}
-
-
-.date-card__icon{
-
-
-    color:var(--text-secondary);
-
-
-    flex-shrink:0;
-
-
-}
-
-
-
-/* ======================
-   Search
-===================== */
-
-
-.search-input{
-
-
-    width:260px;
-
-
-    height:34px;
-
-
-    border:1px solid var(--border-main);
-
-
-    border-radius:14px;
 
 
     display:flex;
@@ -561,31 +279,73 @@
     gap:10px;
 
 
-    padding:0 16px;
+    direction:rtl;
 
 
-    background:var(--surface);
+    white-space:nowrap;
 
 
 }
 
 
-.search-input input{
+.live-clock__icon{
 
 
-    border:none;
+    color:var(--primary);
 
 
-    outline:none;
+    flex-shrink:0;
 
 
-    width:100%;
+}
 
 
-    font-family:var(--font-family);
+.live-clock__text{
+
+
+    display:flex;
+
+
+    flex-direction:column;
+
+
+    align-items:flex-end;
+
+
+    gap:2px;
+
+
+    line-height:1.2;
+
+
+}
+
+
+.live-clock__time{
 
 
     font-size:var(--fs-sm);
+
+
+    font-weight:var(--fw-bold);
+
+
+    color:var(--text-main);
+
+
+    font-variant-numeric:tabular-nums;
+
+
+}
+
+
+.live-clock__date{
+
+
+    font-size:var(--fs-xs);
+
+
+    color:var(--text-secondary);
 
 
 }
@@ -678,22 +438,25 @@
     }
 
     .header__center {
+        display: flex;
+    }
+
+    .live-clock {
+        min-width: 160px;
+        padding: 0 10px;
+    }
+
+    .live-clock__date {
         display: none;
     }
 
     .header__left {
         gap: 8px;
     }
-
-    .search-input {
-        min-width: 0;
-        width: 100%;
-    }
 }
 
 @media (max-width: 560px) {
-    .header__left .chat-icon,
-    .header__right .search-input {
-        display: none;
+    .live-clock__time {
+        font-size: 12px;
     }
 }

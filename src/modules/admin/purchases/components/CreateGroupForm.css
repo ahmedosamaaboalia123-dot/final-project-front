@@ -26,9 +26,19 @@
 
 .create-group-date {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-width: 280px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  max-width: none;
+}
+
+.create-group-date label {
+  white-space: nowrap;
+}
+
+.create-group-date .purchase-input {
+  width: auto;
+  flex: 0 1 220px;
 }
 
 .create-group-date label,
@@ -233,6 +243,20 @@
   cursor: not-allowed;
 }
 
+@media (max-width: 1024px) {
+  .purchase-line-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .purchase-line-side {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0;
+  }
+}
+
 @media (max-width: 768px) {
   .create-group-card {
     padding: 14px;
@@ -252,6 +276,21 @@
   .purchase-line-remove {
     width: 44px;
     height: 44px;
+  }
+
+  .purchase-line-add,
+  .purchase-primary-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .create-group-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .create-group-date {
+    max-width: 100%;
   }
 
   .create-group-date {

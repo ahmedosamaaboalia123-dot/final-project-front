@@ -20,9 +20,19 @@ function lastUserText(messages) {
 
 export async function sendChatMessage(messages, options = {}) {
   const message = lastUserText(messages);
+  const history = Array.isArray(messages)
+    ? messages
+        .slice(-12)
+        .map((item) => ({
+          role: item?.role === "assistant" ? "assistant" : "user",
+          content: String(item?.content ?? item?.text ?? "").trim(),
+        }))
+        .filter((item) => item.content)
+    : [];
   try {
     const payload = await apiClient.post(endpoints.chat.send, {
       message,
+      ...(history.length ? { history } : {}),
       ...(options.conversationId
         ? { conversationId: options.conversationId }
         : {}),

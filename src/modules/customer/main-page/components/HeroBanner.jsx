@@ -1,11 +1,10 @@
 import React from "react";
-import { Coffee, Tag, ReceiptText, Bot, ConciergeBell } from "lucide-react";
+import { Coffee, ReceiptText, Bot, ConciergeBell } from "lucide-react";
 
 export default function HeroBanner({
   tableNumber,
   onOrderNow,
   onOpenAiBot,
-  onOpenOffers,
   onOpenOrders,
   onOpenWaiter,
 }) {
@@ -34,18 +33,10 @@ export default function HeroBanner({
               onClick={onOrderNow}
             >
               <Coffee size={20} className="cta-icon" />
-              <span>الطلب الآن</span>
+              <span>المنيو</span>
             </button>
 
-            <button
-              type="button"
-              className="hero-secondary-btn"
-              onClick={onOpenOffers}
-            >
-              <Tag size={19} className="cta-icon-secondary" />
-              <span>العروض</span>
-            </button>
-            <button type="button" className="hero-secondary-btn" onClick={onOpenOrders}><ReceiptText size={19}/><span>الطلبات</span></button>
+            <button type="button" className="hero-secondary-btn" onClick={onOpenOrders}><ReceiptText size={19}/><span>تتبع الطلبات</span></button>
             <button type="button" className="hero-secondary-btn" onClick={onOpenWaiter || onOpenAiBot}>{tableNumber ? <ConciergeBell size={19}/> : <Bot size={19}/>}<span>{tableNumber ? "خدمات الجرسون" : "روبوت 404"}</span></button>
           </div>
         </div>

@@ -67,6 +67,7 @@ export default function AiChatbotPage({ tableMode = false }) {
 
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationId, setConversationId] = useState(null);
 
   const quickPrompts = [
     { label: "🧊 رشحلي مشروب بارد منعش", query: "رشحلي مشروب بارد منعش ولذيذ" },
@@ -138,7 +139,8 @@ export default function AiChatbotPage({ tableMode = false }) {
     let suggestedProducts = [];
 
     try {
-      const res = await sendChatMessage(history);
+      const res = await sendChatMessage(history, { conversationId });
+      if (res.conversationId) setConversationId(res.conversationId);
       botReply = res.reply || "عذرًا، لم أستطع الرد الآن. جرب سؤالًا آخر.";
 
       // Best-effort: attach real product cards only when the reply mentions a
@@ -186,6 +188,7 @@ export default function AiChatbotPage({ tableMode = false }) {
   };
 
   const handleResetChat = () => {
+    setConversationId(null);
     setMessages([
       {
         id: Date.now(),

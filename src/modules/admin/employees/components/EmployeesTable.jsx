@@ -1,5 +1,10 @@
 import { useNavigate } from "react-router-dom";
-import { Eye } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
+import { ConfirmAction, ConflictDialog } from "@/shared/components";
+import { isConflict } from "@/api/apiError";
+import { useAuthStore } from "@/store/authStore";
+import { can } from "@/modules/auth/permissions/permission";
+import { useDeleteEmployee } from "../hooks/employee.mutations";
 
 const formatDateTime = (value) => {
   if (!value) return "—";
@@ -7,8 +12,48 @@ const formatDateTime = (value) => {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("ar-EG");
 };
 
-export default function EmployeesTable({ employees = [], roles = [], loading = false, isLoading = false, page = 1, onView }) {
+function EmployeeRowActions({ employee, onView }) {
   const navigate = useNavigate();
+  const canUpdate = can(useAuthStore((s) => s.permissions), "employees.update");
+  const currentEmployeeId = useAuthStore((s) => s.employee?.id);
+  const isSelf = String(currentEmployeeId ?? "") === String(employee.id);
+  const mutation = useDeleteEmployee();
+  const conflicted = mutation.isError && isConflict(mutation.error);
+  const open = () => {
+    const sid = String(employee.id);
+    if (typeof onView === "function") onView(sid);
+    else navigate(`/admin/employees/${sid}`);
+  };
+  const handleDelete = () => {
+    return mutation.mutateAsync({
+      employeeId: String(employee.id),
+      expectedVersion: Number(employee.version ?? 0),
+    });
+  };
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <button type="button" className="employee-view" onClick={open}>
+        <Eye size={15} />
+        فتح
+      </button>
+      {canUpdate && (
+        <button type="button" className="employee-view" style={{ background: "#eef6ff", borderColor: "#cfe2ff", color: "#1a5fb4" }} onClick={open}>
+          <Pencil size={15} />
+          تعديل
+        </button>
+      )}
+      {canUpdate && !isSelf && (
+        <ConfirmAction danger triggerClassName="employee-delete" title="حذف نهائي للموظف" message={`سيتم حذف ${employee.name} نهائيا ولا يمكن التراجع عن ذلك.`} confirmLabel="حذف نهائي" pending={mutation.isPending} onConfirm={handleDelete}>
+          <Trash2 size={15} />
+          حذف نهائي
+        </ConfirmAction>
+      )}
+      <ConflictDialog open={conflicted} onClose={() => mutation.resetAttempt()} onReload={() => mutation.resetAttempt()} pending={false} />
+    </div>
+  );
+}
+
+export default function EmployeesTable({ employees = [], roles = [], loading = false, isLoading = false, page = 1, onView }) {
   const busy = Boolean(loading || isLoading);
   const rows = Array.isArray(employees) ? employees : [];
 
@@ -16,12 +61,6 @@ export default function EmployeesTable({ employees = [], roles = [], loading = f
     if (employee?.roleName) return employee.roleName;
     const found = (Array.isArray(roles) ? roles : []).find((role) => String(role.id) === String(employee?.roleId));
     return found?.name || "—";
-  };
-
-  const open = (id) => {
-    const sid = String(id);
-    if (typeof onView === "function") onView(sid);
-    else navigate(`/admin/employees/${sid}`);
   };
 
   return (
@@ -55,10 +94,7 @@ export default function EmployeesTable({ employees = [], roles = [], loading = f
                 </td>
                 <td>{formatDateTime(employee.lastLoginAt)}</td>
                 <td>
-                  <button type="button" className="employee-view" onClick={() => open(employee.id)}>
-                    <Eye size={15} />
-                    فتح
-                  </button>
+                  <EmployeeRowActions employee={employee} onView={onView} />
                 </td>
               </tr>
             ))}

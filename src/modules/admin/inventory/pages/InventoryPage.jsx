@@ -41,7 +41,7 @@ function InventoryPage() {
                 onTabChange={setActiveTab}
             />
 
-            <div style={{ padding: "18px 24px" }}>
+            <div className="inventory-container">
                 {activeTab === "raw" ? (
                     <>
                         <AddMaterialForm />

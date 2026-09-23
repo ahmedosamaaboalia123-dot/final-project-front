@@ -17,7 +17,11 @@ export function useCheckOut(attendanceIdOrOptions, maybeOptions) {
           ? String(idOrBody)
           : attendanceId ?? (idOrBody?.attendanceId ? String(idOrBody.attendanceId) : null);
       if (!id) throw new Error("معرف الحضور مطلوب لتسجيل الانصراف");
-      return attendanceApi.checkOut(id, {});
+      const body = typeof idOrBody === "object" && idOrBody !== null && !Array.isArray(idOrBody) && idOrBody.expectedVersion !== undefined
+        ? { expectedVersion: Number(idOrBody.expectedVersion) }
+        : {};
+      // fallback: if caller passed string id, try to use attendanceId's version from options? caller should pass body
+      return attendanceApi.checkOut(id, body);
     },
     ...options,
   });

@@ -49,20 +49,13 @@ export default function CustomerHeader({
             to={tableNumber ? `/table/${tableNumber}/orders` : "/customer/orders"}
             className="desktop-nav-link"
           >
-            الطلبات
+            تتبع الطلبات
           </Link>
           {!tableNumber && (
             <Link to="/customer/chatbot" className="desktop-nav-link">
               باريستا الذكي
             </Link>
           )}
-          <button
-            type="button"
-            className="desktop-nav-link"
-            onClick={() => onNavigateSection && onNavigateSection("offers")}
-          >
-            عروض
-          </button>
           <button
             type="button"
             className="desktop-nav-link"

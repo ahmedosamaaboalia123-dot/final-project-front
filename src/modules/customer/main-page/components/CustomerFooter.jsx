@@ -1,19 +1,16 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { Coffee, MapPin, Clock, Phone, LayoutDashboard, ShieldCheck, Heart } from "lucide-react";
+import { Coffee, MapPin, Clock, Phone, Heart } from "lucide-react";
 
 export default function CustomerFooter({ footerData }) {
   const brandName = footerData?.brandName || "Coffee 404";
-  const location = footerData?.location || "إيتاي البارود - البحيرة (بجوار المحطة)";
+  const location = footerData?.location || "محافظة البحيرة - مركز ايتاي البارود - شارع ابو بكر الصديق متفرع من شارع مجلس المدينة بجوار كنيسة العذراء مريم";
   const hours = footerData?.hours || "يومياً من 8:00 صباحاً حتى 12:00 منتصف الليل";
-  const phone = footerData?.phone || "0100 000 0404";
+  const phone = footerData?.phone || "01000000404";
 
   return (
     <footer className="customer-page-footer">
       <div className="footer-content-inner">
-        {/* Desktop Columns Grid */}
         <div className="footer-grid-wrapper">
-          {/* Col 1: Brand & Bio */}
           <div className="footer-col brand-col">
             <div className="footer-brand-title">
               <div className="footer-logo-badge">
@@ -21,17 +18,13 @@ export default function CustomerFooter({ footerData }) {
               </div>
               <div className="footer-brand-name-group">
                 <span className="brand-primary-name">{brandName}</span>
-                <span className="brand-tagline">مذاق القهوة المختصة بأعلى معايير الجودة</span>
+                <span className="brand-tagline">مذاق القهوة المختصة</span>
               </div>
             </div>
-            <p className="footer-brand-description">
-              نقدم لكم تجربة قهوة استثنائية مع تشكيلة واسعة من المشروبات الساخنة والباردة والحلويات الطازجة المحضرة يومياً بكل حب وإتقان.
-            </p>
+            <p className="footer-brand-description">قهوة مختصة ومشروبات طازجة يومياً.</p>
           </div>
-
-          {/* Col 2: Info & Hours */}
           <div className="footer-col info-col">
-            <h4 className="footer-col-heading">معلومات والتواصل</h4>
+            <h4 className="footer-col-heading">العنوان وساعات العمل</h4>
             <div className="footer-meta-info">
               <p className="footer-meta-item">
                 <MapPin size={16} className="meta-icon" />
@@ -43,43 +36,15 @@ export default function CustomerFooter({ footerData }) {
               </p>
               <p className="footer-meta-item">
                 <Phone size={16} className="meta-icon" />
-                <span>خدمة العملاء: {phone}</span>
+                <span>{phone}</span>
               </p>
             </div>
           </div>
-
-          {/* Col 3: Quick Navigation */}
-          <div className="footer-col nav-col">
-            <h4 className="footer-col-heading">روابط سريعة</h4>
-            <ul className="footer-nav-list">
-              <li>
-                <a href="#categories-section-anchor" className="footer-nav-link">قائمة المينيو</a>
-              </li>
-              <li>
-                <a href="#offers-section-anchor" className="footer-nav-link">العروض المميزة</a>
-              </li>
-              <li>
-                <Link to="/admin/dashboard" className="footer-nav-link admin-highlight">
-                  <LayoutDashboard size={14} />
-                  <span>لوحة تحكم الأدمن</span>
-                </Link>
-              </li>
-            </ul>
-          </div>
         </div>
-
-        {/* Bottom Bar */}
         <div className="footer-bottom-bar">
           <p className="footer-copyright">
-            جميع الحقوق محفوظة © {new Date().getFullYear()} كافيه 404 COFFEE. صنع بـ <Heart size={13} className="heart-icon" /> لخدمتكم.
+            © {new Date().getFullYear()} 404 COFFEE <Heart size={13} className="heart-icon" />
           </p>
-          <div className="footer-quick-links">
-            <a href="#contact" className="footer-link-item">اتصل بنا</a>
-            <span className="footer-link-dot">•</span>
-            <a href="#terms" className="footer-link-item">الشروط والأحكام</a>
-            <span className="footer-link-dot">•</span>
-            <a href="#privacy" className="footer-link-item">سياسة الخصوصية</a>
-          </div>
         </div>
       </div>
     </footer>

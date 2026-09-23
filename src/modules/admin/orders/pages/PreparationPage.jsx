@@ -21,10 +21,14 @@ const tabs = [
 export default function PreparationPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("current");
-  const [group, setGroup] = useState("online");
-  const [page, setPage] = useState(1);
-  const { data, isLoading, error } = usePreparation({ group, tab: activeTab, page, limit: 10 });
-  const shown = data?.items || [];
+  const [onlinePage, setOnlinePage] = useState(1);
+  const [tablesPage, setTablesPage] = useState(1);
+  const online = usePreparation({ group: "online", tab: activeTab, page: onlinePage, limit: 10 });
+  const tables = usePreparation({ group: "tables", tab: activeTab, page: tablesPage, limit: 10 });
+  const onlineRows = online.data?.items || [];
+  const tablesRows = tables.data?.items || [];
+  const error = online.error || tables.error;
+  const isLoading = online.isLoading || tables.isLoading;
 
   const openOrder = (order) => navigate(`/admin/orders/preparation/${order.id}`);
 
@@ -82,7 +86,7 @@ export default function PreparationPage() {
           <button
             key={tab.key}
             className={`prep-tab ${activeTab === tab.key ? "active" : ""}`}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => { setActiveTab(tab.key); setOnlinePage(1); setTablesPage(1); }}
           >
             {tab.label}
           </button>
@@ -92,10 +96,19 @@ export default function PreparationPage() {
       {isLoading ? (
         <p className="prep-loading">جاري تحميل الطلبات...</p>
       ) : (
-        <div className="prep-cols"><div className="prep-col"><h4 className="prep-col-title">{group === "tables" ? "طلبات الطاولات" : "الأونلاين والتيك أواي"}</h4>{renderTable(shown, "لا توجد طلبات")}</div></div>
+        <div className="prep-cols">
+          <div className="prep-col">
+            <h4 className="prep-col-title">الأونلاين والتيك أواي</h4>
+            {renderTable(onlineRows, "لا توجد طلبات أونلاين")}
+            <ServerPagination meta={online.data?.meta} onPageChange={setOnlinePage} disabled={online.isLoading} label="طلب" />
+          </div>
+          <div className="prep-col">
+            <h4 className="prep-col-title">طلبات الطاولات</h4>
+            {renderTable(tablesRows, "لا توجد طلبات طاولات")}
+            <ServerPagination meta={tables.data?.meta} onPageChange={setTablesPage} disabled={tables.isLoading} label="طلب" />
+          </div>
+        </div>
       )}
-      <div className="prep-tabs"><button className={group === "online" ? "prep-tab active" : "prep-tab"} onClick={() => { setGroup("online"); setPage(1); }}>أونلاين وتيك أواي</button><button className={group === "tables" ? "prep-tab active" : "prep-tab"} onClick={() => { setGroup("tables"); setPage(1); }}>الطاولات</button></div>
-      <ServerPagination meta={data?.meta} onPageChange={setPage} disabled={isLoading} label="طلب" />
     </div>
   );
 }

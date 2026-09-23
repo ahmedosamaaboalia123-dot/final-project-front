@@ -174,7 +174,7 @@ export default function GroupDetails({ groupId, onBack }) {
       purchaseItemId: String(item.id),
       receivedOn: parsed.data.receivedOn,
       expiryOn: parsed.data.expiryOn ?? null,
-      expectedItemVersion: item.version,
+      expectedVersion: item.version,
     });
   };
 

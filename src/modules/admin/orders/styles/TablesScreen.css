@@ -4,6 +4,7 @@
   gap: var(--space-sm);
   height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--space-sm) var(--space-md);
 }
 
@@ -39,6 +40,19 @@
 .table-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-sm);
+}
+
+.table-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.table-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: var(--surface-soft);
+  transform: none;
+  box-shadow: none;
 }
 
 /* ── Table card (busy — green background) ── */

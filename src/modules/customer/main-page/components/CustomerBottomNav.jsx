@@ -8,7 +8,7 @@ export default function CustomerBottomNav({
   const tabs = [
     { id: "home", label: "الرئيسية", icon: Home },
     { id: "menu", label: "القائمة", icon: Coffee },
-    { id: "orders", label: "الطلبات", icon: ClipboardList },
+    { id: "orders", label: "تتبع الطلبات", icon: ClipboardList },
     { id: "profile", label: "حسابي", icon: User },
   ];
 

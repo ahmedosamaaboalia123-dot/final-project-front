@@ -1,3 +1,4 @@
+// deprecated for categories/bestSellers/branchInfo/reviews — now from API (getPublicCategories/getTopProducts/reviewsApi/CAFE_BRANCH)
 export const MAIN_PAGE_DATA = {
   header: {
     brandNumber: "404",

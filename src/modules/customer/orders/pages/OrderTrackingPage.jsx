@@ -28,7 +28,7 @@ import {
 } from "../../../table/services/tableOrdersService";
 import { getActiveTableOrder } from "../../../table/services/tableGateway";
 import { getPublicOrderTracking, lookupOrderByPhone } from "../../checkout/services/orderGateway";
-import { getCustomerProfile } from "../../checkout/services/checkoutCustomerService";
+import { getCustomerProfile, updateLastOrder } from "../../checkout/services/checkoutCustomerService";
 import { createTrackingSocket } from "@/services/realtime";
 import { customerStorage } from "../../services/customerStorage";
 import OrderBarcode from "../../checkout/components/OrderBarcode";
@@ -114,6 +114,17 @@ export default function OrderTrackingPage({ tableMode = false }) {
           if (remoteOrder) {
             setOrder(remoteOrder);
             setHasSearched(true);
+            try {
+              const code = String(remoteOrder.orderNumber || remoteOrder.publicOrderNumber || orderId);
+              const profile = getCustomerProfile();
+              if (!profile.lastOrder?.orderNumber || String(profile.lastOrder.orderNumber) === code) {
+                updateLastOrder({
+                  orderNumber: code,
+                  status: String(remoteOrder.status || ""),
+                  version: Number(remoteOrder.version ?? remoteOrder.eventSequence ?? 0) || 0,
+                });
+              }
+            } catch {}
           }
         })
         .catch(() => {})

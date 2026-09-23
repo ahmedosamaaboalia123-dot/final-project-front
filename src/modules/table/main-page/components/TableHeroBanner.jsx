@@ -1,10 +1,10 @@
 import React from "react";
-import { Coffee, MessageSquare, Bell, Sparkles } from "lucide-react";
+import { Coffee, ReceiptText, Bell, Sparkles } from "lucide-react";
 import { useTable } from "../../context/TableContext";
 
 export default function TableHeroBanner({
   onOrderNow,
-  onOpenAiBot,
+  onTrackOrder,
   onCallWaiter,
 }) {
   const { tableNumber } = useTable();
@@ -57,7 +57,7 @@ export default function TableHeroBanner({
               onClick={onOrderNow}
             >
               <Coffee size={20} className="cta-icon" />
-              <span>اطلب لطاولة {tableNumber}</span>
+              <span>المنيو</span>
             </button>
 
             <button
@@ -77,10 +77,10 @@ export default function TableHeroBanner({
             <button
               type="button"
               className="hero-secondary-btn"
-              onClick={onOpenAiBot}
+              onClick={onTrackOrder}
             >
-              <MessageSquare size={19} className="cta-icon-secondary" />
-              <span>روبوت 404 الذكي</span>
+              <ReceiptText size={19} className="cta-icon-secondary" />
+              <span>تتبع طلب الطاولة</span>
             </button>
           </div>
         </div>

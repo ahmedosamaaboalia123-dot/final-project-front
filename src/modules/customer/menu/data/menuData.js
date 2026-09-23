@@ -1,3 +1,4 @@
+// deprecated: kept for reference — real categories now from /api/v1/catalog (getPublicCategories)
 export const MENU_CATEGORIES = [
   {
     id: "coffee",
@@ -31,6 +32,7 @@ export const MENU_CATEGORIES = [
   },
 ];
 
+// deprecated: kept for reference — real products now from /api/v1/catalog (getPublicMenu)
 export const MENU_PRODUCTS = [
   {
     id: "mocha_404",

@@ -16,7 +16,6 @@ export const ORDER_ENDPOINTS = Object.freeze({
   readyItem: (id) => `/preparation/order-items/${encodeURIComponent(id)}/ready`,
   tablesBoard: "/tables-board", table: (id) => `/tables/${encodeURIComponent(id)}`,
   tableOrder: (id) => `/tables/${encodeURIComponent(id)}/admin-orders`,
-  tableQr: (id) => `/tables/${encodeURIComponent(id)}/rotate-qr`,
   session: (id) => `/table-sessions/${encodeURIComponent(id)}`,
   sessionItems: (id) => `/table-sessions/${encodeURIComponent(id)}/items`,
   sessionCancel: (id) => `/table-sessions/${encodeURIComponent(id)}/cancel`,

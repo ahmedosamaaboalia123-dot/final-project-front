@@ -14,6 +14,7 @@ export default function SalesPage() {
   const [sections, setSections] = useState([]);
   const [products, setProducts] = useState([]);
   const [activeSection, setActiveSection] = useState(null);
+  const [productSearch, setProductSearch] = useState("");
   const [invoice, setInvoice] = useState([]);
   const [customer, setCustomer] = useState({ name: "", phone: "", address: "" });
   const [fulfillmentType, setFulfillmentType] = useState("PICKUP");
@@ -36,7 +37,7 @@ export default function SalesPage() {
         if (cancelled) return;
         setSections(catalog.categories);
         setProducts(catalog.products);
-        if (catalog.categories.length) setActiveSection(catalog.categories[0]);
+        if (catalog.categories.length) setActiveSection({ id: "__all__", name: "كل المنتجات" });
         setLoading(false);
       })
       .catch((e) => {
@@ -52,9 +53,19 @@ export default function SalesPage() {
     ordersApi.table(id).then(async (context) => context.session?.id ? { ...context, ...(await ordersApi.session(context.session.id)) } : context).then(setTableContext).catch((e) => setError(e.response?.data?.error?.messageAr || e.message));
   }, [id, isTable]);
 
-  const visible = useMemo(
-    () => (activeSection ? getProductsForSection(products, activeSection) : products),
-    [products, activeSection]
+  const visible = useMemo(() => {
+    const base =
+      !activeSection || activeSection.id === "__all__"
+        ? products
+        : getProductsForSection(products, activeSection);
+    const query = productSearch.trim();
+    if (!query) return base;
+    return (base || []).filter((product) => String(product.name || "").includes(query));
+  }, [products, activeSection, productSearch]);
+
+  const sectionOptions = useMemo(
+    () => [{ id: "__all__", name: "كل المنتجات" }, ...sections],
+    [sections]
   );
 
   const add = (product, variant, size) =>
@@ -128,24 +139,12 @@ export default function SalesPage() {
 
       {loading && <p className="sales-loading">جاري تحميل المنتجات...</p>}
 
-      {!isTable && (
-        <div className="sales-customer-fields">
-          <div className="fulfillment-switch" role="group" aria-label="نوع استلام الطلب">
-            <button type="button" className={fulfillmentType === "PICKUP" ? "active" : ""} onClick={() => setFulfillmentType("PICKUP")}>تيك أواي</button>
-            <button type="button" className={fulfillmentType === "DELIVERY" ? "active" : ""} onClick={() => setFulfillmentType("DELIVERY")}>توصيل</button>
-          </div>
-          <input placeholder="اسم العميل" value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
-          <input placeholder="رقم الهاتف" value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
-          {fulfillmentType === "DELIVERY" && <input placeholder="عنوان التوصيل" value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} />}
-        </div>
-      )}
-
       <div className="sales-layout">
         {/* الأقسام — يمين (RTL) */}
         <aside className="sales-sections-col">
           <h3 className="sales-col-title">الأقسام</h3>
           <div className="sales-sections-list">
-            {sections.map((section) => (
+            {sectionOptions.map((section) => (
               <button
                 key={section.id || section.name}
                 className={`sales-section-btn ${activeSection?.id === section.id ? "active" : ""}`}
@@ -159,7 +158,15 @@ export default function SalesPage() {
 
         {/* المنتجات — شمال/وسط (RTL) */}
         <section className="sales-products-col">
-          <h3 className="sales-col-title">المنتجات{activeSection?.name ? ` — ${activeSection.name}` : ""}</h3>
+          <h3 className="sales-col-title">المنتجات{activeSection?.name && activeSection.id !== "__all__" ? ` — ${activeSection.name}` : ""}</h3>
+          <div className="sales-products-search">
+            <input
+              placeholder="ابحث باسم المنتج"
+              aria-label="بحث باسم المنتج"
+              value={productSearch}
+              onChange={(event) => setProductSearch(event.target.value)}
+            />
+          </div>
           <div className="sales-products-grid">
             {visible.flatMap((product) =>
               (product.variants || []).flatMap((variant) =>
@@ -192,6 +199,29 @@ export default function SalesPage() {
           <h3 className="sales-col-title">الفاتورة</h3>
           <span className="sales-invoice-count">{invoice.length} منتج</span>
         </div>
+
+        {!isTable && (
+          <div className="sales-customer-fields">
+            <div className="fulfillment-switch" role="group" aria-label="نوع الطلب">
+              <button type="button" className={fulfillmentType === "PICKUP" ? "active" : ""} onClick={() => setFulfillmentType("PICKUP")}>تيك أواي</button>
+              <button type="button" className={fulfillmentType === "DELIVERY" ? "active" : ""} onClick={() => setFulfillmentType("DELIVERY")}>أونلاين</button>
+            </div>
+            <label>
+              <span>اسم العميل</span>
+              <input placeholder="اسم العميل" value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
+            </label>
+            <label>
+              <span>رقم الهاتف</span>
+              <input placeholder="رقم الهاتف" value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
+            </label>
+            {fulfillmentType === "DELIVERY" && (
+              <label>
+                <span>عنوان التوصيل</span>
+                <input placeholder="عنوان التوصيل" value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} />
+              </label>
+            )}
+          </div>
+        )}
 
         {invoice.length === 0 ? (
           <div className="sales-empty">لم تُضف أي منتج بعد</div>

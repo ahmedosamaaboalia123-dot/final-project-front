@@ -96,6 +96,7 @@ export default function BusyCardPage() {
               <span className="card-title">طلب {order.orderNumber}</span>
               {order.channel === "CUSTOMER_WEB" && <span className="card-badge-outside">من الخارج</span>}
               <span className="card-status">{statusText[order.status] || order.status}</span>
+              {order.assignedDelegate && <span className="card-delegate">تم التسليم للمندوب{order.assignedDelegate.name ? ` — ${order.assignedDelegate.name}` : ""}</span>}
             </div>
           </div>
           {(actionError || cancelOrder.isError || completeTakeaway.isError || readyItem.isError) && !conflict && <p role="alert">{actionError || cancelOrder.error?.message || completeTakeaway.error?.message || readyItem.error?.message}</p>}

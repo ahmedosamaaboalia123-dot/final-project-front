@@ -105,7 +105,22 @@ describe("employees + attendance v1 contract", () => {
     expect(screen.employees[0].statusLabel).toBe("نشط");
     expect(screen.employees[0].version).toBe(1);
     expect(screen.summary.pendingDevices).toBe(2);
-    expect(toRoleOptions(screen.roles)).toEqual([{ value: "r1", label: "كاشير (مستوى 10)" }]);
+    expect(toRoleOptions(screen.roles)).toEqual([]);
+    expect(toRoleOptions([
+      { id: "r1", name: "Admin", level: 100, isSystem: true },
+      { id: "r2", name: "Employee", level: 10, isSystem: true },
+      { id: "r3", name: "محاسب", level: 1, isSystem: false },
+    ])).toEqual([
+      { value: "r1", label: "ادمن" },
+      { value: "r2", label: "موظف" },
+    ]);
+    expect(toRoleOptions([
+      { id: "r1", name: "Admin", level: 100 },
+      { id: "r2", name: "Employee", level: 10 },
+    ])).toEqual([
+      { value: "r1", label: "ادمن" },
+      { value: "r2", label: "موظف" },
+    ]);
     const details = toEmployeeDetails({ employee: { id: "e1", status: "INACTIVE" }, passwordPlainText: "secret" });
     expect(details.employee.statusLabel).toBe("موقوف");
     expect(details.passwordPlainText).toBe("secret");
@@ -114,9 +129,16 @@ describe("employees + attendance v1 contract", () => {
     expect(devices.items[0].attemptCount).toBe(3);
     const roles = toRolesList([{ id: "r1", name: "x", permissions: ["a", 1] }]);
     expect(roles.roles[0].permissions).toEqual(["a", "1"]);
+    const rolesFromItems = toRolesList({ items: [{ id: "r1", name: "Admin", level: 100, isSystem: true, permissions: [] }] });
+    expect(rolesFromItems.roles).toHaveLength(1);
+    expect(rolesFromItems.roles[0].name).toBe("Admin");
     const catalog = toPermissionsCatalog([{ id: "p1", key: "k", pageKey: "pg", action: "read" }]);
     expect(catalog.byPage).toHaveLength(1);
     expect(catalog.byPage[0].pageKey).toBe("pg");
+    const catalogFromItems = toPermissionsCatalog({ items: [{ _id: "p1", key: "employees.read", pageKey: "employees", action: "read" }] });
+    expect(catalogFromItems.permissions).toHaveLength(1);
+    expect(catalogFromItems.permissions[0].id).toBe("p1");
+    expect(catalogFromItems.byPage[0].pageKey).toBe("employees");
   });
 
   it("cleans attendance lists and details", () => {
@@ -153,16 +175,13 @@ describe("employees + attendance v1 contract", () => {
 });
 
 describe("employees page on the v1 layer", () => {
-  it("renders server employees with tabs and no delete actions", () => {
+  it("renders server employees with delete/edit actions and no tabs", () => {
     renderApp(<EmployeesPage />, { route: "/admin/employees", auth: adminAuth });
     expect(screen.getByText("أحمد")).toBeInTheDocument();
     expect(screen.getByText("سارة")).toBeInTheDocument();
-    expect(screen.queryByText("حذف الموظف")).not.toBeInTheDocument();
-    expect(screen.queryByText("حذف")).not.toBeInTheDocument();
-  });
-
-  it("opens devices and attendance tabs from the server", () => {
-    renderApp(<EmployeesPage />, { route: "/admin/employees?tab=attendance", auth: adminAuth });
-    expect(screen.getAllByText("مفتوح").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("حذف نهائي").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("تعديل").length).toBeGreaterThan(0);
+    expect(screen.queryByText("الأجهزة")).not.toBeInTheDocument();
+    expect(screen.queryByText("الأدوار")).not.toBeInTheDocument();
   });
 });

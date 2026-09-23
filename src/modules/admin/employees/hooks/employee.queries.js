@@ -19,10 +19,10 @@ export function useEmployeesScreen(params) {
   });
 }
 
-export function useEmployeeDetails(id, include = []) {
+export function useEmployeeDetails(id, include = [], query = {}) {
   return useQuery({
-    queryKey: queryKeys.employees.detail(id, include.join(",")),
-    queryFn: async () => toEmployeeDetails(await employeesApi.details(id, include)),
+    queryKey: queryKeys.employees.detail(id, `${include.join(",")}:${query.activityPage ?? 1}:${query.activityLimit ?? 10}:${query.attendancePage ?? 1}:${query.attendanceLimit ?? 10}`),
+    queryFn: async () => toEmployeeDetails(await employeesApi.details(id, include, query)),
     enabled: Boolean(id),
   });
 }

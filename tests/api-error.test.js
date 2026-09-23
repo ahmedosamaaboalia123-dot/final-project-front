@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyFieldErrors, isConflict, isDevicePending, isPermissionDenied, normalizeApiError } from "@/api/apiError";
+import { applyFieldErrors, isConflict, isDevicePending, isPermissionDenied, isSessionExpired, normalizeApiError } from "@/api/apiError";
 
 describe("API errors", () => {
   it("preserves backend error details and request id", () => {
@@ -22,5 +22,12 @@ describe("API errors", () => {
 
   it("classifies a missing response as retryable network failure", () => {
     expect(normalizeApiError(new Error("offline"))).toMatchObject({ code: "NETWORK_ERROR", retryable: true });
+  });
+
+  it("treats only 401 as a dead session worth wiping", () => {
+    expect(isSessionExpired({ response: { status: 401, data: {} } })).toBe(true);
+    expect(isSessionExpired({ response: { status: 403, data: {} } })).toBe(false);
+    expect(isSessionExpired({ response: { status: 500, data: {} } })).toBe(false);
+    expect(isSessionExpired(new Error("offline"))).toBe(false);
   });
 });
